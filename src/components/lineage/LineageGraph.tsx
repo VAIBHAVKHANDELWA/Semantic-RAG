@@ -28,7 +28,10 @@ export const LineageGraph: React.FC<LineageGraphProps> = ({ conflictId, isModal 
 
   const [selectedNode, setSelectedNode] = useState<LineageNodeData | null>(null);
 
-  // Nodes for the dynamic provenance graph
+  // Nodes for the dynamic provenance graph with temporal status styling
+  const existingIsArchived = conflict?.status === 'PROMOTED_INCOMING_ARCHIVED_OLD' || conflict?.status === 'ACCEPTED_INCOMING';
+  const incomingIsPromoted = conflict?.status === 'PROMOTED_INCOMING_ARCHIVED_OLD' || conflict?.status === 'ACCEPTED_INCOMING';
+
   const graphNodes: LineageNodeData[] = [
     {
       id: 'node-root-1',
@@ -40,28 +43,38 @@ export const LineageGraph: React.FC<LineageGraphProps> = ({ conflictId, isModal 
         docName: conflict?.incomingChunk.docName,
         author: conflict?.incomingChunk.author,
         uploadDate: conflict?.incomingChunk.uploadDate,
+        effectiveDate: conflict?.incomingChunk.effectiveDate || '2026-09-07',
+        temporalStatus: 'Active',
         tenantScope: conflict?.incomingChunk.tenantId,
         modality: 'Apache Tika Text Extractor',
         executionLog: '[00:00.012] Ingested 4.2 MB binary stream\n[00:00.045] PDF structure validated. SHA256 matches.'
       }
     },
     {
-      id: 'node-parse-1',
-      type: 'parsed_block',
-      title: 'Parsed Layout Block #04',
-      subtitle: 'Tesseract OCR / LayoutLM v3',
-      status: 'clean',
+      id: 'node-existing-1',
+      type: 'semantic_chunk',
+      title: existingIsArchived ? `[ARCHIVED] ${conflict?.existingChunk.id}` : `[ACTIVE] ${conflict?.existingChunk.id}`,
+      subtitle: existingIsArchived ? 'Soft-Archived Audit Vault' : 'Live Vector Store Candidate',
+      status: existingIsArchived ? 'pruned' : 'clean',
       metadata: {
-        docName: conflict?.incomingChunk.docName,
-        modality: 'Tesseract OCR Page 4 (99.2% confidence)',
-        tokenCount: 262,
-        executionLog: '[00:00.120] Page layout segmented.\n[00:00.180] Extracted Section 4.2 Home Office Reimbursement text.'
+        docName: conflict?.existingChunk.docName,
+        author: conflict?.existingChunk.author,
+        uploadDate: conflict?.existingChunk.uploadDate,
+        effectiveDate: conflict?.existingChunk.effectiveDate,
+        temporalStatus: existingIsArchived ? 'Archived' : 'Active',
+        tokenCount: conflict?.existingChunk.tokenCount,
+        embeddingId: conflict?.existingChunk.embeddingId,
+        vectorPreview: conflict?.existingChunk.vectorPreview,
+        tenantScope: conflict?.existingChunk.tenantId,
+        executionLog: existingIsArchived 
+          ? '[Status] Soft-Archived for Audit Compliance. Retained in historical vector vault.'
+          : '[Status] Live Active Vector serving production RAG queries.'
       }
     },
     {
       id: 'node-chunk-1',
       type: 'semantic_chunk',
-      title: `Semantic Chunk #${conflict?.incomingChunk.id || 'chk-14'}`,
+      title: `Incoming Chunk #${conflict?.incomingChunk.id || 'chk-14'}`,
       subtitle: 'MiniLM-L6-v2 Vector (384-dim)',
       status: 'processing',
       metadata: {
@@ -70,20 +83,24 @@ export const LineageGraph: React.FC<LineageGraphProps> = ({ conflictId, isModal 
         embeddingId: conflict?.incomingChunk.embeddingId,
         vectorPreview: conflict?.incomingChunk.vectorPreview || [0.045, -0.188, 0.871, 0.135, -0.41, 0.598],
         tenantScope: conflict?.incomingChunk.tenantId,
+        uploadDate: conflict?.incomingChunk.uploadDate,
+        effectiveDate: conflict?.incomingChunk.effectiveDate,
+        temporalStatus: incomingIsPromoted ? 'Active' : 'Quarantined',
         executionLog: '[00:00.240] Tokenized 262 tokens.\n[00:00.310] Generated 384-dim float32 vector embedding.'
       }
     },
     {
       id: 'node-conflict-1',
       type: 'conflict_node',
-      title: `Conflict Pair (${(conflict.similarityScore * 100).toFixed(1)}% Cosine)`,
-      subtitle: `Quarantined vs ${conflict?.existingChunk.docName}`,
-      status: 'quarantined',
+      title: `Collision (${(conflict.similarityScore * 100).toFixed(1)}% Cosine)`,
+      subtitle: conflict.status === 'PENDING' ? 'Quarantined Holding Tank' : `Resolved: ${conflict.status}`,
+      status: conflict.status === 'PENDING' ? 'quarantined' : 'clean',
       metadata: {
         docName: conflict?.existingChunk.docName,
         similarity: conflict?.similarityScore,
         tenantScope: conflict?.department,
-        executionLog: `[00:00.410] Cosine collision detected (${(conflict.similarityScore * 100).toFixed(1)}%).\n[00:00.430] LLM Verdict: ${conflict.verdictType}.\n[00:00.450] Flagged for Human Compliance Quarantine.`
+        temporalStatus: conflict.status === 'PENDING' ? 'Quarantined' : 'Active',
+        executionLog: `[00:00.410] Cosine collision detected (${(conflict.similarityScore * 100).toFixed(1)}%).\n[00:00.430] LLM Verdict: ${conflict.verdictType}.\n[00:00.450] Temporal Status: ${conflict.status}.`
       }
     },
     {
@@ -95,18 +112,33 @@ export const LineageGraph: React.FC<LineageGraphProps> = ({ conflictId, isModal 
       metadata: {
         docName: 'b2b_policies_vector_v4',
         tenantScope: conflict?.department,
-        embeddingId: conflict?.status === 'ACCEPTED_INCOMING' ? conflict.incomingChunk.embeddingId : conflict.existingChunk.embeddingId,
+        temporalStatus: incomingIsPromoted ? 'Active' : 'Quarantined',
+        embeddingId: incomingIsPromoted ? conflict.incomingChunk.embeddingId : conflict.existingChunk.embeddingId,
         executionLog: `[Status] ${conflict.status === 'PENDING' ? 'Quarantine Holding Tank' : 'Committed with Provenance Metadata Tag'}`
       }
     }
   ];
 
-  const nodeColorClasses = {
-    root_doc: 'border-blue-500/40 bg-blue-500/10 text-blue-300 hover:border-blue-400',
-    parsed_block: 'border-purple-500/40 bg-purple-500/10 text-purple-300 hover:border-purple-400',
-    semantic_chunk: 'border-cyan-500/40 bg-cyan-500/10 text-cyan-300 hover:border-cyan-400',
-    conflict_node: 'border-amber-500/50 bg-amber-500/10 text-amber-300 hover:border-amber-400 glow-amber',
-    vector_db: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:border-emerald-400'
+  const getNodeColorClass = (node: LineageNodeData) => {
+    const tStatus = node.metadata.temporalStatus;
+    if (tStatus === 'Archived') {
+      return 'border-slate-700 bg-slate-800/60 text-slate-400 font-mono';
+    }
+    if (tStatus === 'Active') {
+      return 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300 shadow-lg shadow-emerald-500/10 hover:border-emerald-400';
+    }
+    if (tStatus === 'Quarantined' || node.type === 'conflict_node') {
+      return 'border-amber-500/50 bg-amber-500/10 text-amber-300 hover:border-amber-400 glow-amber';
+    }
+
+    const defaultClasses = {
+      root_doc: 'border-blue-500/40 bg-blue-500/10 text-blue-300 hover:border-blue-400',
+      parsed_block: 'border-purple-500/40 bg-purple-500/10 text-purple-300 hover:border-purple-400',
+      semantic_chunk: 'border-cyan-500/40 bg-cyan-500/10 text-cyan-300 hover:border-cyan-400',
+      conflict_node: 'border-amber-500/50 bg-amber-500/10 text-amber-300 hover:border-amber-400 glow-amber',
+      vector_db: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:border-emerald-400'
+    };
+    return defaultClasses[node.type];
   };
 
   const nodeIcons = {
@@ -154,7 +186,7 @@ export const LineageGraph: React.FC<LineageGraphProps> = ({ conflictId, isModal 
                 <motion.div
                   whileHover={{ scale: 1.04 }}
                   onClick={() => setSelectedNode(node)}
-                  className={`w-60 p-4 rounded-xl border cursor-pointer transition-all ${nodeColorClasses[node.type]} ${
+                  className={`w-60 p-4 rounded-xl border cursor-pointer transition-all ${getNodeColorClass(node)} ${
                     isSelected ? 'ring-2 ring-cyan-400 ring-offset-2 ring-offset-slate-950 shadow-2xl' : ''
                   }`}
                 >

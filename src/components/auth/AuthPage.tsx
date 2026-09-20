@@ -2,15 +2,18 @@ import React, { useState } from 'react';
 import { 
   Network, 
   ShieldCheck, 
-  User, 
+  User as UserIcon, 
   Mail, 
   Lock, 
   Building2, 
   ArrowRight, 
-  Key
+  Key,
+  UserCheck,
+  Activity,
+  FileCheck
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import type { TenantScope, UserRole } from '../../types';
+import type { RbacTenant, RbacRole } from '../../types';
 import { motion } from 'framer-motion';
 
 interface AuthPageProps {
@@ -18,26 +21,24 @@ interface AuthPageProps {
 }
 
 export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
-  const { login, signup, navigate } = useApp();
-  const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
+  const { 
+    loginWithProfile, 
+    loginAsDataSteward, 
+    loginAsSystemAdmin, 
+    loginAsAuditor, 
+    navigate 
+  } = useApp();
 
+  const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('alex.rivera@enterprise.ai');
   const [password, setPassword] = useState('••••••••••••');
-  const [role, setRole] = useState<UserRole>('IT_ADMIN');
-  const [tenant, setTenant] = useState<TenantScope>('HR');
+  const [role, setRole] = useState<RbacRole>('DATA_STEWARD');
+  const [tenant, setTenant] = useState<RbacTenant>('HR');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (mode === 'login') {
-      login(email, password, role, tenant);
-    } else {
-      signup(name || 'Enterprise User', email, password, role, tenant);
-    }
-  };
-
-  const handleDemoQuickLogin = (demoRole: UserRole, demoTenant: TenantScope, demoEmail: string) => {
-    login(demoEmail, 'demo123', demoRole, demoTenant);
+    loginWithProfile(email, role, tenant);
   };
 
   return (
@@ -61,11 +62,71 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
             <Network className="w-6 h-6 text-white" />
           </div>
           <h2 className="text-2xl font-bold text-slate-100">
-            {mode === 'login' ? 'Enterprise Sign In' : 'Create Middleware Account'}
+            {mode === 'login' ? 'JWT Enterprise Sign In' : 'Create Middleware Account'}
           </h2>
           <p className="text-xs text-slate-400">
-            Enforce multi-tenant isolation & conflict-aware document pruning.
+            Enforce Role-Based Access Control (RBAC) & multi-tenant isolation.
           </p>
+        </div>
+
+        {/* 1-CLICK QUICK PERSONA LOGIN BUTTONS (REQUIRED BY PROMPT) */}
+        <div className="space-y-2 p-4 rounded-2xl bg-slate-950/80 border border-cyan-500/30 glow-cyan">
+          <div className="text-[11px] font-mono text-cyan-300 font-bold uppercase tracking-wider text-center flex items-center justify-center gap-1.5">
+            <Key className="w-3.5 h-3.5 text-cyan-400" /> Instant Quick-Select Personas (Mock JWT)
+          </div>
+
+          <div className="space-y-2 text-xs">
+            {/* Button 1: Data Steward (HR) */}
+            <button
+              onClick={loginAsDataSteward}
+              className="w-full p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-cyan-500/40 text-slate-200 text-left flex items-center justify-between transition-all group"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-300">
+                  <UserCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-cyan-300">Login as Data Steward (HR)</div>
+                  <div className="text-[10px] text-slate-500 font-mono">Quarantine Queue & Tenant Vector Health</div>
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-cyan-400 group-hover:translate-x-1 transition-transform" />
+            </button>
+
+            {/* Button 2: System Admin */}
+            <button
+              onClick={loginAsSystemAdmin}
+              className="w-full p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-slate-200 text-left flex items-center justify-between transition-all group"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-300">
+                  <Activity className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-amber-300">Login as System Admin</div>
+                  <div className="text-[10px] text-slate-500 font-mono">LLM API Costs, Cache Hits & Backpressure</div>
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-amber-400 group-hover:translate-x-1 transition-transform" />
+            </button>
+
+            {/* Button 3: Compliance Auditor */}
+            <button
+              onClick={loginAsAuditor}
+              className="w-full p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-purple-500/40 text-slate-200 text-left flex items-center justify-between transition-all group"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-lg bg-purple-500/20 text-purple-300">
+                  <FileCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-purple-300">Login as Auditor</div>
+                  <div className="text-[10px] text-slate-500 font-mono">Centered Vector Lineage Search & Provenance</div>
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-purple-400 group-hover:translate-x-1 transition-transform" />
+            </button>
+          </div>
         </div>
 
         {/* Tab Switcher */}
@@ -78,7 +139,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            Sign In
+            Custom Sign In
           </button>
           <button
             onClick={() => setMode('signup')}
@@ -88,17 +149,17 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            Sign Up
+            Custom Register
           </button>
         </div>
 
-        {/* Auth Form */}
+        {/* Custom Auth Form */}
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           {mode === 'signup' && (
             <div>
               <label className="block text-slate-400 mb-1 font-medium">Full Name</label>
               <div className="relative">
-                <User className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                <UserIcon className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
                 <input
                   type="text"
                   placeholder="e.g. Sarah Jenkins"
@@ -144,37 +205,35 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
           {/* Profile Role Selector */}
           <div>
             <label className="block text-slate-300 font-semibold mb-1 flex items-center justify-between">
-              <span>Select Profile Role</span>
+              <span>Select RBAC Persona</span>
               <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
             </label>
             <select
               value={role}
-              onChange={e => setRole(e.target.value as UserRole)}
+              onChange={e => setRole(e.target.value as RbacRole)}
               className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2.5 text-slate-200 focus:outline-none focus:border-cyan-500/50 font-mono"
             >
-              <option value="IT_ADMIN">IT Admin & Infrastructure Security</option>
-              <option value="COMPLIANCE_AUDITOR">Compliance & Regulatory Auditor</option>
-              <option value="AI_ARCHITECT">Lead AI & RAG Architect</option>
-              <option value="LEGAL_COUNSEL">Enterprise Legal Counsel</option>
+              <option value="DATA_STEWARD">DATA_STEWARD (HR / Department Vector Health)</option>
+              <option value="SYSTEM_ADMIN">SYSTEM_ADMIN (Global Telemetry & API Cost)</option>
+              <option value="COMPLIANCE_AUDITOR">COMPLIANCE_AUDITOR (Vector Lineage Search)</option>
             </select>
           </div>
 
-          {/* Department / Tenant Isolation Scope Selector */}
+          {/* Department / Tenant Scope Selector */}
           <div>
             <label className="block text-slate-300 font-semibold mb-1 flex items-center justify-between">
-              <span>Tenant Scope Enforced</span>
+              <span>Tenant Scope Scope</span>
               <Building2 className="w-3.5 h-3.5 text-emerald-400" />
             </label>
             <select
               value={tenant}
-              onChange={e => setTenant(e.target.value as TenantScope)}
+              onChange={e => setTenant(e.target.value as RbacTenant)}
               className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2.5 text-slate-200 focus:outline-none focus:border-cyan-500/50 font-mono"
             >
-              <option value="HR">HR & People Operations (Isolated)</option>
-              <option value="LEGAL">Legal & Regulatory Compliance</option>
-              <option value="FINANCE">Finance & Procurement</option>
-              <option value="ENGINEERING">Engineering & Architecture</option>
-              <option value="ALL">Global Multi-Tenant Scope</option>
+              <option value="HR">HR (Isolated Human Resources Scope)</option>
+              <option value="LEGAL">LEGAL (Legal & Compliance)</option>
+              <option value="FINANCE">FINANCE (Finance & Procurement)</option>
+              <option value="GLOBAL">GLOBAL (Multi-Tenant Scope)</option>
             </select>
           </div>
 
@@ -183,33 +242,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
             type="submit"
             className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 transition-all hover:scale-[1.02]"
           >
-            <span>{mode === 'login' ? 'Sign In to Workspace' : 'Create Enterprise Account'}</span>
+            <span>{mode === 'login' ? 'Issue JWT & Authenticate' : 'Register & Issue JWT'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
-
-        {/* Demo Quick-Login Shortcuts */}
-        <div className="pt-4 border-t border-slate-800 space-y-2">
-          <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider text-center flex items-center justify-center gap-1">
-            <Key className="w-3 h-3 text-cyan-400" /> Demo 1-Click Quick Roles
-          </div>
-          <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
-            <button
-              onClick={() => handleDemoQuickLogin('IT_ADMIN', 'HR', 'alex.rivera@enterprise.ai')}
-              className="p-2 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 text-left transition-colors truncate"
-            >
-              <div className="font-bold text-cyan-400">IT Admin</div>
-              <div className="text-[9px] text-slate-500 truncate">HR Scope</div>
-            </button>
-            <button
-              onClick={() => handleDemoQuickLogin('LEGAL_COUNSEL', 'LEGAL', 'marcus.vance@legal.ai')}
-              className="p-2 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 text-left transition-colors truncate"
-            >
-              <div className="font-bold text-amber-400">Legal Counsel</div>
-              <div className="text-[9px] text-slate-500 truncate">Legal Scope</div>
-            </button>
-          </div>
-        </div>
       </motion.div>
     </div>
   );

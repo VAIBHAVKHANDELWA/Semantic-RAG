@@ -6,20 +6,25 @@ import {
   Zap, 
   Activity, 
   Cpu, 
-  FileSpreadsheet, 
   FileType,
   RefreshCw,
-  Sliders
+  Sliders,
+  Cloud,
+  ShieldAlert
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { GlassCard } from '../common/GlassCard';
 import { StatusBadge } from '../common/StatusBadge';
+import { DirectToCloudModal } from './DirectToCloudModal';
+import { BatchIngestionTracker } from './BatchIngestionTracker';
 import { motion } from 'framer-motion';
 
 export const IngestionHub: React.FC = () => {
   const { 
     ingestionQueue, 
-    addIngestionFile, 
+    createBatchJob,
+    toggleBackpressureThrottling,
+    isThrottled,
     removeIngestionItem, 
     selectedTenant, 
     telemetry 
@@ -27,9 +32,10 @@ export const IngestionHub: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
 
   // Filter queue items based on active tenant scope
-  const filteredQueue = selectedTenant === 'ALL'
+  const filteredQueue = selectedTenant === 'ALL' || selectedTenant === 'GLOBAL'
     ? ingestionQueue
     : ingestionQueue.filter(i => i.department === selectedTenant);
 
@@ -46,17 +52,15 @@ export const IngestionHub: React.FC = () => {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      Array.from(e.dataTransfer.files).forEach(file => {
-        addIngestionFile(file);
-      });
+      const droppedFiles = Array.from(e.dataTransfer.files);
+      createBatchJob(droppedFiles);
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      Array.from(e.target.files).forEach(file => {
-        addIngestionFile(file);
-      });
+      const selectedFiles = Array.from(e.target.files);
+      createBatchJob(selectedFiles);
     }
   };
 
@@ -79,17 +83,34 @@ export const IngestionHub: React.FC = () => {
         <div>
           <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
             <Upload className="w-5 h-5 text-cyan-400" />
-            Multi-Modal Ingestion Hub
+            Stage 2: Enterprise Ingestion & Real-Time Telemetry
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Real-time document pipeline with automatic Apache Tika text extraction & Tesseract OCR parsing.
+            Zero-copy Direct-to-Cloud S3 Presigned URL streaming, asynchronous multi-file dropzone, pre-flight OCR modality detection, and Server-Sent Events (SSE) telemetry.
           </p>
         </div>
 
-        {/* Modality Status Pills */}
-        <div className="flex items-center gap-3">
-          <StatusBadge status="native" label="Apache Tika (Native PDF/DOCX)" />
-          <StatusBadge status="ocr" label="Tesseract v5 OCR Engine" />
+        {/* Action Buttons for Stage 2 Features */}
+        <div className="flex flex-wrap items-center gap-3 font-mono text-xs">
+          <button
+            onClick={() => setModalOpen(true)}
+            className="px-3.5 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 font-bold flex items-center gap-2 transition-all shadow-md shadow-cyan-500/10"
+          >
+            <Cloud className="w-4 h-4 text-cyan-400" />
+            <span>Inspect S3 Presigned Ticket Handshake</span>
+          </button>
+
+          <button
+            onClick={toggleBackpressureThrottling}
+            className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-2 border transition-all ${
+              isThrottled 
+                ? 'bg-amber-500 text-slate-950 border-amber-400 font-extrabold shadow-lg shadow-amber-500/20' 
+                : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700'
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4 text-amber-400" />
+            <span>{isThrottled ? 'Throttled: Reset Circuit Breaker' : 'Simulate OpenAI Rate Limit Backpressure'}</span>
+          </button>
         </div>
       </div>
 
@@ -120,15 +141,14 @@ export const IngestionHub: React.FC = () => {
               <Upload className="w-7 h-7" />
             </div>
             <h3 className="text-sm font-bold text-slate-200">
-              Drag & Drop Enterprise Documents Here
+              Drag & Drop Enterprise Document Batches Here (Up to 10,000 PDFs)
             </h3>
             <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
-              Supports native PDFs, DOCX, scanned contract images, and regulatory policy mandates up to 100MB per file.
+              Direct-to-Cloud architecture streams files straight to tenant S3 bucket via presigned tickets, bypassing Java backend memory.
             </p>
             <div className="mt-4 flex items-center justify-center gap-4 text-[11px] text-slate-500 font-mono">
-              <span className="flex items-center gap-1"><FileText className="w-3.5 h-3.5 text-blue-400" /> PDF / DOCX</span>
-              <span className="flex items-center gap-1"><FileType className="w-3.5 h-3.5 text-purple-400" /> Scanned OCR</span>
-              <span className="flex items-center gap-1"><FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" /> Policy Spreadsheets</span>
+              <span className="flex items-center gap-1 text-cyan-400 font-bold"><FileText className="w-3.5 h-3.5" /> PDF / DOCX (Native Tika)</span>
+              <span className="flex items-center gap-1 text-amber-400 font-bold"><FileType className="w-3.5 h-3.5" /> Scanned OCR (Tesseract Warning)</span>
             </div>
           </div>
         </div>
@@ -142,8 +162,8 @@ export const IngestionHub: React.FC = () => {
                 <span>Backpressure & Worker Control</span>
               </div>
               <StatusBadge 
-                status={telemetry.llmCircuitBreakerStatus === 'CLOSED' ? 'closed' : 'open'} 
-                label={`CIRCUIT: ${telemetry.llmCircuitBreakerStatus}`}
+                status={isThrottled ? 'pending' : 'closed'} 
+                label={`CIRCUIT: ${isThrottled ? 'OPEN (THROTTLED)' : 'CLOSED (NORMAL)'}`}
               />
             </div>
 
@@ -154,12 +174,12 @@ export const IngestionHub: React.FC = () => {
                   <span className="text-slate-400 flex items-center gap-1">
                     <Zap className="w-3.5 h-3.5 text-amber-400" /> RabbitMQ Worker Rate
                   </span>
-                  <span className="font-mono text-amber-300 font-bold">{telemetry.rabbitMqRate} msg/s</span>
+                  <span className="font-mono text-amber-300 font-bold">{isThrottled ? '42 msg/s (Throttled)' : `${telemetry.rabbitMqRate} msg/s`}</span>
                 </div>
                 <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
                   <div 
-                    className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-all duration-500" 
-                    style={{ width: `${Math.min(100, (telemetry.rabbitMqRate / 2000) * 100)}%` }}
+                    className={`h-full transition-all duration-500 ${isThrottled ? 'bg-amber-500' : 'bg-gradient-to-r from-amber-500 to-yellow-400'}`} 
+                    style={{ width: `${isThrottled ? 15 : Math.min(100, (telemetry.rabbitMqRate / 2000) * 100)}%` }}
                   />
                 </div>
               </div>
@@ -170,12 +190,12 @@ export const IngestionHub: React.FC = () => {
                   <span className="text-slate-400 flex items-center gap-1">
                     <Cpu className="w-3.5 h-3.5 text-purple-400" /> LLM Token Bucket Throughput
                   </span>
-                  <span className="font-mono text-purple-300 font-bold">{telemetry.tokensPerSec.toLocaleString()} t/s</span>
+                  <span className="font-mono text-purple-300 font-bold">{isThrottled ? '1,200 t/s (Queued)' : `${telemetry.tokensPerSec.toLocaleString()} t/s`}</span>
                 </div>
                 <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-500" 
-                    style={{ width: `${Math.min(100, (telemetry.tokensPerSec / 20000) * 100)}%` }}
+                    style={{ width: `${isThrottled ? 10 : Math.min(100, (telemetry.tokensPerSec / 20000) * 100)}%` }}
                   />
                 </div>
               </div>
@@ -186,10 +206,18 @@ export const IngestionHub: React.FC = () => {
             <span className="flex items-center gap-1">
               <Sliders className="w-3.5 h-3.5 text-cyan-400" /> Auto-Throttling Threshold
             </span>
-            <span className="font-mono text-emerald-400">NORMAL (0% Drop Rate)</span>
+            <span className={`font-mono font-bold ${isThrottled ? 'text-amber-400' : 'text-emerald-400'}`}>
+              {isThrottled ? 'THROTTLED (Queue Active)' : 'NORMAL (0% Drop Rate)'}
+            </span>
           </div>
         </GlassCard>
       </div>
+
+      {/* Stage 2 Real-Time SSE Batch Tracker */}
+      <BatchIngestionTracker />
+
+      {/* Direct-to-Cloud Presigned URL Handshake Modal */}
+      <DirectToCloudModal isOpen={modalOpen} onClose={() => setModalOpen(false)} />
 
       {/* Ingestion Queue Table */}
       <GlassCard className="p-0 overflow-hidden">

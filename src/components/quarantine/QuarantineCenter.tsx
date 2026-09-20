@@ -8,11 +8,12 @@ import {
   Edit3, 
   Sparkles, 
   CheckCheck,
-  Search
+  Search,
+  Lock
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { LLMVerdictBar } from './LLMVerdictBar';
-import { SideBySideDiff } from './SideBySideDiff';
+import { ConflictViewer } from './ConflictViewer';
 import { ManualMergeModal } from './ManualMergeModal';
 import { GlassCard } from '../common/GlassCard';
 import { StatusBadge } from '../common/StatusBadge';
@@ -25,7 +26,8 @@ export const QuarantineCenter: React.FC = () => {
     setSelectedConflictId, 
     resolveConflict, 
     selectedTenant,
-    setLineageModalConflictId
+    setLineageModalConflictId,
+    user
   } = useApp();
 
   const [minSimilarity, setMinSimilarity] = useState<number>(0.85);
@@ -51,7 +53,7 @@ export const QuarantineCenter: React.FC = () => {
 
   const activeConflict = conflicts.find(c => c.id === selectedConflictId) || filteredConflicts[0];
 
-  const handleAction = (action: 'ACCEPTED_INCOMING' | 'KEPT_EXISTING' | 'DISCARDED_BOTH') => {
+  const handleAction = (action: 'ACCEPTED_INCOMING' | 'PROMOTED_INCOMING_ARCHIVED_OLD' | 'KEPT_EXISTING' | 'DISCARDED_BOTH') => {
     if (activeConflict) {
       resolveConflict(activeConflict.id, action);
     }
@@ -204,13 +206,23 @@ export const QuarantineCenter: React.FC = () => {
                   onOpenLineageModal={(id) => setLineageModalConflictId(id)}
                 />
 
-                {/* 2. Side-by-Side Diff Viewer */}
-                <SideBySideDiff 
+                {/* 2. Pluggable Department Conflict Viewer */}
+                <ConflictViewer 
                   existingChunk={activeConflict.existingChunk} 
-                  incomingChunk={activeConflict.incomingChunk} 
+                  incomingChunk={activeConflict.incomingChunk}
+                  tenant={activeConflict.department}
                 />
 
-                {/* 3. Action Bar with 4 Resolution Buttons */}
+                {/* System Admin Privacy Restriction Alert Banner */}
+                {user?.role === 'SYSTEM_ADMIN' && (
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 font-mono text-xs flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-amber-400" /> System Admin Privacy Scope: Document text is masked for tenant security. Metadata & stuck states are visible.
+                    </span>
+                  </div>
+                )}
+
+                {/* 3. Action Bar with 4 Resolution Buttons or Read-Only Banner */}
                 <GlassCard className="p-4 bg-slate-900/90 border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
                   <div className="text-xs text-slate-400 font-medium">
                     {activeConflict.status === 'PENDING' ? (
@@ -224,48 +236,54 @@ export const QuarantineCenter: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Decision Buttons */}
-                  <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-                    {/* Button 1: Accept Incoming (Prune Old) */}
-                    <button
-                      onClick={() => handleAction('ACCEPTED_INCOMING')}
-                      className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-emerald-500/10"
-                      title="Keep Chunk B and delete Chunk A from vector store"
-                    >
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      <span>Accept Incoming (Prune Old)</span>
-                    </button>
+                  {/* Decision Buttons (Disabled for Auditor) */}
+                  {user?.role === 'COMPLIANCE_AUDITOR' ? (
+                    <div className="px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-300 font-mono text-xs font-bold flex items-center gap-2">
+                      <Lock className="w-4 h-4" /> Read-Only Compliance Auditor Mode (Action Buttons Restricted)
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+                      {/* Button 1: Promote Incoming (Archive Old) */}
+                      <button
+                        onClick={() => handleAction('PROMOTED_INCOMING_ARCHIVED_OLD')}
+                        className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-emerald-500/10"
+                        title="Promote Chunk B to Active and safely soft-archive Chunk A for audit compliance"
+                      >
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <span>Promote Incoming (Archive Old)</span>
+                      </button>
 
-                    {/* Button 2: Keep Existing (Discard Incoming) */}
-                    <button
-                      onClick={() => handleAction('KEPT_EXISTING')}
-                      className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-amber-500/10"
-                      title="Discard Chunk B and retain existing Chunk A"
-                    >
-                      <XCircle className="w-4 h-4 text-amber-400" />
-                      <span>Keep Existing (Discard Incoming)</span>
-                    </button>
+                      {/* Button 2: Keep Existing (Discard Incoming) */}
+                      <button
+                        onClick={() => handleAction('KEPT_EXISTING')}
+                        className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-amber-500/10"
+                        title="Discard Chunk B and retain existing Chunk A"
+                      >
+                        <XCircle className="w-4 h-4 text-amber-400" />
+                        <span>Keep Existing (Discard Incoming)</span>
+                      </button>
 
-                    {/* Button 3: Discard Both */}
-                    <button
-                      onClick={() => handleAction('DISCARDED_BOTH')}
-                      className="px-3.5 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-rose-500/10"
-                      title="Purge both chunks from pipeline"
-                    >
-                      <Trash2 className="w-4 h-4 text-rose-400" />
-                      <span>Discard Both</span>
-                    </button>
+                      {/* Button 3: Discard Both */}
+                      <button
+                        onClick={() => handleAction('DISCARDED_BOTH')}
+                        className="px-3.5 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-rose-500/10"
+                        title="Purge both chunks from pipeline"
+                      >
+                        <Trash2 className="w-4 h-4 text-rose-400" />
+                        <span>Discard Both</span>
+                      </button>
 
-                    {/* Button 4: Edit & Merge Manually */}
-                    <button
-                      onClick={() => setMergeModalOpen(true)}
-                      className="px-3.5 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-cyan-500/10"
-                      title="Edit reconciled text manually"
-                    >
-                      <Edit3 className="w-4 h-4 text-cyan-400" />
-                      <span>Edit & Merge</span>
-                    </button>
-                  </div>
+                      {/* Button 4: Edit & Merge Manually */}
+                      <button
+                        onClick={() => setMergeModalOpen(true)}
+                        className="px-3.5 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-cyan-500/10"
+                        title="Edit reconciled text manually"
+                      >
+                        <Edit3 className="w-4 h-4 text-cyan-400" />
+                        <span>Edit & Merge</span>
+                      </button>
+                    </div>
+                  )}
                 </GlassCard>
               </motion.div>
             </AnimatePresence>

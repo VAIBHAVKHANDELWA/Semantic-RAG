@@ -59,7 +59,7 @@ export const OnboardingPage: React.FC = () => {
               </div>
               <div className="text-left">
                 <div className="font-semibold text-slate-200">{user.name}</div>
-                <div className="text-[10px] text-slate-500 font-mono">{user.roleLabel}</div>
+                <div className="text-[10px] text-slate-500 font-mono">{user.role}</div>
               </div>
             </div>
           )}

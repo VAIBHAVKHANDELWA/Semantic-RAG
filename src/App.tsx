@@ -2,22 +2,19 @@ import React from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
-import { QuarantineCenter } from './components/quarantine/QuarantineCenter';
-import { IngestionHub } from './components/ingestion/IngestionHub';
-import { LineageGraph } from './components/lineage/LineageGraph';
-import { LineageGraphModal } from './components/lineage/LineageGraphModal';
-import { AnalyticsDashboard } from './components/analytics/AnalyticsDashboard';
+import { PersonaDashboard } from './components/dashboard/PersonaDashboard';
 import { ToastContainer } from './components/common/ToastContainer';
+import { LineageGraphModal } from './components/lineage/LineageGraphModal';
 import { LandingPage } from './components/landing/LandingPage';
 import { AuthPage } from './components/auth/AuthPage';
 import { OnboardingPage } from './components/auth/OnboardingPage';
+import { Unauthorized403 } from './components/auth/Unauthorized403';
+import { RoleGuard } from './components/auth/RoleGuard';
 
 const MainDashboardLayout: React.FC = () => {
-  const { activeView } = useApp();
-
   return (
     <div className="min-h-screen bg-[#090d16] text-slate-100 flex overflow-x-hidden font-sans">
-      {/* Collapsible Nav Rail */}
+      {/* Collapsible Role-Driven Nav Rail */}
       <Sidebar />
 
       {/* Main Content Area */}
@@ -25,10 +22,7 @@ const MainDashboardLayout: React.FC = () => {
         <Header />
 
         <main className="flex-1 overflow-y-auto pb-12">
-          {activeView === 'quarantine' && <QuarantineCenter />}
-          {activeView === 'ingestion' && <IngestionHub />}
-          {activeView === 'lineage' && <LineageGraph />}
-          {activeView === 'analytics' && <AnalyticsDashboard />}
+          <PersonaDashboard />
         </main>
       </div>
 
@@ -66,14 +60,43 @@ const RouterView: React.FC = () => {
       );
     case '/onboarding':
       return (
-        <>
+        <RoleGuard allowedRoles={['DATA_STEWARD', 'SYSTEM_ADMIN', 'COMPLIANCE_AUDITOR']}>
           <OnboardingPage />
+          <ToastContainer />
+        </RoleGuard>
+      );
+    case '/admin/billing':
+      return (
+        <RoleGuard allowedRoles={['SYSTEM_ADMIN']}>
+          <MainDashboardLayout />
+        </RoleGuard>
+      );
+    case '/admin/tenants':
+      return (
+        <RoleGuard allowedRoles={['SYSTEM_ADMIN']}>
+          <MainDashboardLayout />
+        </RoleGuard>
+      );
+    case '/admin/logs':
+      return (
+        <RoleGuard allowedRoles={['SYSTEM_ADMIN']}>
+          <MainDashboardLayout />
+        </RoleGuard>
+      );
+    case '/unauthorized':
+      return (
+        <>
+          <Unauthorized403 allowedRoles={['SYSTEM_ADMIN']} />
           <ToastContainer />
         </>
       );
     case '/dashboard':
     default:
-      return <MainDashboardLayout />;
+      return (
+        <RoleGuard allowedRoles={['DATA_STEWARD', 'SYSTEM_ADMIN', 'COMPLIANCE_AUDITOR']}>
+          <MainDashboardLayout />
+        </RoleGuard>
+      );
   }
 };
 

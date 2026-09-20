@@ -1,4 +1,49 @@
-import type { Tenant, IngestionItem, QuarantineConflict, DbscanCluster, SystemTelemetry, NotificationItem } from '../types';
+import type { Tenant, IngestionItem, QuarantineConflict, DbscanCluster, SystemTelemetry, NotificationItem, AuditLogEntry, ChunkMetadata } from '../types';
+
+export const INITIAL_ARCHIVED_CHUNKS: ChunkMetadata[] = [
+  {
+    id: 'chk-hr-2020-01',
+    docName: 'COVID_Remote_Policy_2020.pdf',
+    docYear: 2020,
+    author: 'Legacy Benefits Team',
+    uploadDate: '2020-04-01',
+    effectiveDate: '2020-04-01 to 2022-03-13',
+    temporalStatus: 'Archived',
+    tenantId: 'HR',
+    embeddingId: 'vec-77a8-4491-b00',
+    vectorPreview: [0.040, -0.190, 0.880, 0.125, -0.400, 0.605],
+    tokenCount: 210,
+    text: 'Section 4.1 - Mandatory Remote Stipend:\nDuring emergency remote operations, all personnel are entitled to a tax-free stipend of $500 per month for home workstation setup.'
+  },
+  {
+    id: 'chk-fin-2019-03',
+    docName: 'Travel_Expense_Policy_2019.pdf',
+    docYear: 2019,
+    author: 'Finance Ops 2019',
+    uploadDate: '2019-01-15',
+    effectiveDate: '2019-01-15 to 2022-11-04',
+    temporalStatus: 'Archived',
+    tenantId: 'FINANCE',
+    embeddingId: 'vec-44e1-9012-f00',
+    vectorPreview: [0.120, -0.650, 0.330, 0.895, -0.010, 0.435],
+    tokenCount: 185,
+    text: 'Section 2.3 - Meal Allowance:\nPer diem meal expenses cap at $75/day worldwide without receipts required.'
+  },
+  {
+    id: 'chk-leg-2018-09',
+    docName: 'EU_GDPR_Compliance_Baseline_2018.pdf',
+    docYear: 2018,
+    author: 'EU Legal Council',
+    uploadDate: '2018-05-25',
+    effectiveDate: '2018-05-25 to 2025-12-31',
+    temporalStatus: 'Archived',
+    tenantId: 'LEGAL',
+    embeddingId: 'vec-11b3-3392-a00',
+    vectorPreview: [-0.300, 0.535, 0.001, -0.885, 0.220, 0.100],
+    tokenCount: 320,
+    text: 'Article 5 - Data Subject Retention:\nPersonal data shall be stored for a maximum of 3 years following account closure unless required by tax statute.'
+  }
+];
 
 export const INITIAL_TENANTS: Tenant[] = [
   {
@@ -7,7 +52,9 @@ export const INITIAL_TENANTS: Tenant[] = [
     code: 'HR',
     isolationLevel: 'Hardware Isolated',
     activeConflictsCount: 2,
-    totalIngestedDocs: 1420
+    totalIngestedDocs: 1420,
+    rateLimitReqPerMin: 600,
+    storageUsedGb: 14.8
   },
   {
     id: 't-legal',
@@ -15,7 +62,9 @@ export const INITIAL_TENANTS: Tenant[] = [
     code: 'LEGAL',
     isolationLevel: 'Encrypted Tenant Context',
     activeConflictsCount: 1,
-    totalIngestedDocs: 890
+    totalIngestedDocs: 890,
+    rateLimitReqPerMin: 400,
+    storageUsedGb: 22.4
   },
   {
     id: 't-finance',
@@ -23,7 +72,9 @@ export const INITIAL_TENANTS: Tenant[] = [
     code: 'FINANCE',
     isolationLevel: 'Logical Namespace',
     activeConflictsCount: 1,
-    totalIngestedDocs: 2150
+    totalIngestedDocs: 2150,
+    rateLimitReqPerMin: 800,
+    storageUsedGb: 18.2
   },
   {
     id: 't-eng',
@@ -31,7 +82,9 @@ export const INITIAL_TENANTS: Tenant[] = [
     code: 'ENGINEERING',
     isolationLevel: 'Logical Namespace',
     activeConflictsCount: 1,
-    totalIngestedDocs: 3410
+    totalIngestedDocs: 3410,
+    rateLimitReqPerMin: 1200,
+    storageUsedGb: 45.6
   }
 ];
 
@@ -119,6 +172,8 @@ export const INITIAL_QUARANTINE_CONFLICTS: QuarantineConflict[] = [
       docYear: 2022,
       author: 'Legacy HR Dept',
       uploadDate: '2022-03-14',
+      effectiveDate: '2022-03-14 to Present',
+      temporalStatus: 'Active',
       tenantId: 'HR',
       embeddingId: 'vec-77a8-4491-b01',
       vectorPreview: [0.042, -0.192, 0.884, 0.129, -0.402, 0.611],
@@ -135,6 +190,8 @@ export const INITIAL_QUARANTINE_CONFLICTS: QuarantineConflict[] = [
       docYear: 2026,
       author: 'Sarah Jenkins (VP People)',
       uploadDate: '2026-09-07',
+      effectiveDate: '2026-09-07 (Pending Promotion)',
+      temporalStatus: 'Quarantined',
       tenantId: 'HR',
       embeddingId: 'vec-99f2-1088-c44',
       vectorPreview: [0.045, -0.188, 0.871, 0.135, -0.410, 0.598],
@@ -161,6 +218,8 @@ export const INITIAL_QUARANTINE_CONFLICTS: QuarantineConflict[] = [
       docYear: 2021,
       author: 'Legal Ops Group',
       uploadDate: '2021-01-10',
+      effectiveDate: '2021-01-10 to Present',
+      temporalStatus: 'Active',
       tenantId: 'LEGAL',
       embeddingId: 'vec-11b3-3392-a08',
       vectorPreview: [-0.312, 0.541, 0.002, -0.891, 0.224, 0.109],
@@ -177,6 +236,8 @@ export const INITIAL_QUARANTINE_CONFLICTS: QuarantineConflict[] = [
       docYear: 2026,
       author: 'Marcus Vance (Chief Legal Counsel)',
       uploadDate: '2026-09-07',
+      effectiveDate: '2026-09-07 (Pending Promotion)',
+      temporalStatus: 'Quarantined',
       tenantId: 'LEGAL',
       embeddingId: 'vec-11b3-3392-a12',
       vectorPreview: [-0.309, 0.539, 0.005, -0.885, 0.230, 0.104],
@@ -203,6 +264,8 @@ export const INITIAL_QUARANTINE_CONFLICTS: QuarantineConflict[] = [
       docYear: 2022,
       author: 'Finance Audit Team',
       uploadDate: '2022-11-05',
+      effectiveDate: '2022-11-05 to Present',
+      temporalStatus: 'Active',
       tenantId: 'FINANCE',
       embeddingId: 'vec-44e1-9012-f04',
       vectorPreview: [0.128, -0.661, 0.334, 0.901, -0.012, 0.441],
@@ -218,6 +281,8 @@ export const INITIAL_QUARANTINE_CONFLICTS: QuarantineConflict[] = [
       docYear: 2026,
       author: 'Elena Rostova (Head of Finance)',
       uploadDate: '2026-09-07',
+      effectiveDate: '2026-09-07 (Pending Promotion)',
+      temporalStatus: 'Quarantined',
       tenantId: 'FINANCE',
       embeddingId: 'vec-44e1-9012-f19',
       vectorPreview: [0.131, -0.658, 0.329, 0.898, -0.015, 0.448],
@@ -243,6 +308,8 @@ export const INITIAL_QUARANTINE_CONFLICTS: QuarantineConflict[] = [
       docYear: 2023,
       author: 'Infra Operations',
       uploadDate: '2023-05-19',
+      effectiveDate: '2023-05-19 to Present',
+      temporalStatus: 'Active',
       tenantId: 'ENGINEERING',
       embeddingId: 'vec-8812-3301-c88',
       vectorPreview: [-0.198, 0.412, -0.771, 0.055, 0.339, 0.812],
@@ -258,6 +325,8 @@ export const INITIAL_QUARANTINE_CONFLICTS: QuarantineConflict[] = [
       docYear: 2026,
       author: 'David Chen (Principal SRE)',
       uploadDate: '2026-09-07',
+      effectiveDate: '2026-09-07 (Pending Promotion)',
+      temporalStatus: 'Quarantined',
       tenantId: 'ENGINEERING',
       embeddingId: 'vec-8812-3301-c99',
       vectorPreview: [-0.194, 0.418, -0.765, 0.051, 0.342, 0.805],
@@ -382,3 +451,51 @@ export const INITIAL_NOTIFICATIONS: NotificationItem[] = [
     read: true
   }
 ];
+
+export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
+  {
+    id: 'aud-901',
+    timestamp: '2026-09-17 18:45:12',
+    actorName: 'Sarah Jenkins',
+    actorRole: 'DATA_STEWARD',
+    department: 'HR',
+    action: 'RESOLVE_ACCEPT',
+    targetId: 'conf-8901',
+    details: 'Accepted incoming chunk "Global_Remote_Work_Framework_2026.pdf" and pruned legacy 2022 chunk.',
+    integrityHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+  },
+  {
+    id: 'aud-902',
+    timestamp: '2026-09-17 19:04:33',
+    actorName: 'Marcus Vance',
+    actorRole: 'COMPLIANCE_AUDITOR',
+    department: 'LEGAL',
+    action: 'MANUAL_MERGE',
+    targetId: 'conf-8902',
+    details: 'Merged EU IP assignment clause addendum text with 2021 baseline policy context.',
+    integrityHash: '8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4'
+  },
+  {
+    id: 'aud-903',
+    timestamp: '2026-09-17 19:15:00',
+    actorName: 'Alex Rivera',
+    actorRole: 'SYSTEM_ADMIN',
+    department: 'GLOBAL',
+    action: 'RATE_LIMIT_CHANGE',
+    targetId: 't-eng',
+    details: 'Increased Engineering tenant worker rate limit to 1,200 req/min for high-throughput batch indexing.',
+    integrityHash: '320e8b2b64d0f622e9643a6d713c4155a5b28d7d42cf28eb7127e2a44f50937c'
+  },
+  {
+    id: 'aud-904',
+    timestamp: '2026-09-17 19:22:45',
+    actorName: 'Elena Rostova',
+    actorRole: 'DATA_STEWARD',
+    department: 'FINANCE',
+    action: 'RESOLVE_KEEP',
+    targetId: 'conf-8903',
+    details: 'Retained existing Q3 Per Diem Cap chunk ($120/day) and discarded duplicate incoming chunk.',
+    integrityHash: 'a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e'
+  }
+];
+

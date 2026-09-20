@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, User, Calendar, Database, Shield, Hash, Code, Terminal, AlertTriangle, X } from 'lucide-react';
+import { FileText, User, Calendar, Database, Shield, Hash, Code, Terminal, AlertTriangle, X, Clock } from 'lucide-react';
 
 export interface LineageNodeData {
   id: string;
@@ -11,6 +11,8 @@ export interface LineageNodeData {
     docName?: string;
     author?: string;
     uploadDate?: string;
+    effectiveDate?: string;
+    temporalStatus?: 'Active' | 'Archived' | 'Quarantined';
     tenantScope?: string;
     modality?: string;
     tokenCount?: number;
@@ -72,6 +74,28 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({ node, onClose }) =
           <div className="flex justify-between items-center py-1 border-b border-slate-800/60">
             <span className="text-slate-500 flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-amber-400" /> Uploaded</span>
             <span className="font-mono text-slate-200">{node.metadata.uploadDate}</span>
+          </div>
+        )}
+
+        {node.metadata.effectiveDate && (
+          <div className="flex justify-between items-center py-1 border-b border-slate-800/60">
+            <span className="text-slate-500 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-cyan-400" /> Effective</span>
+            <span className="font-mono text-cyan-300 text-[11px] font-semibold">{node.metadata.effectiveDate}</span>
+          </div>
+        )}
+
+        {node.metadata.temporalStatus && (
+          <div className="flex justify-between items-center py-1 border-b border-slate-800/60">
+            <span className="text-slate-500 flex items-center gap-1.5"><Shield className="w-3.5 h-3.5 text-emerald-400" /> Temporal Status</span>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
+              node.metadata.temporalStatus === 'Active' 
+                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                : node.metadata.temporalStatus === 'Archived'
+                ? 'bg-slate-800 text-slate-400 border border-slate-700'
+                : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+            }`}>
+              {node.metadata.temporalStatus}
+            </span>
           </div>
         )}
 

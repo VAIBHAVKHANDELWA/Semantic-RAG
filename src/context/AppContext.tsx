@@ -9,9 +9,16 @@ import type {
   NotificationItem,
   PipelineStage,
   AppRoute,
-  UserProfile,
-  UserRole,
-  WorkspaceConfig 
+  ActiveViewType,
+  User,
+  RbacRole,
+  RbacTenant,
+  WorkspaceConfig,
+  AuditLogEntry,
+  UploadTicketResponse,
+  BatchIngestionJob,
+  SseTelemetryPayload,
+  ChunkMetadata
 } from '../types';
 import { 
   INITIAL_TENANTS, 
@@ -19,7 +26,9 @@ import {
   INITIAL_QUARANTINE_CONFLICTS, 
   INITIAL_DBSCAN_CLUSTERS, 
   INITIAL_TELEMETRY, 
-  INITIAL_NOTIFICATIONS 
+  INITIAL_NOTIFICATIONS,
+  INITIAL_AUDIT_LOGS,
+  INITIAL_ARCHIVED_CHUNKS
 } from '../data/mockData';
 
 export interface ToastMessage {
@@ -34,11 +43,15 @@ interface AppContextType {
   currentRoute: AppRoute;
   navigate: (route: AppRoute) => void;
 
-  // Mock Authentication & Profile State
-  user: UserProfile | null;
+  // Mock JWT Authentication & User Store
+  user: User | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string, role: UserRole, tenant: TenantScope) => void;
-  signup: (name: string, email: string, password: string, role: UserRole, tenant: TenantScope) => void;
+  token: string | null;
+  loginAsDataSteward: () => void;
+  loginAsSystemAdmin: () => void;
+  loginAsAuditor: () => void;
+  loginWithProfile: (email: string, role: RbacRole, tenant: RbacTenant) => void;
+  setRoleDebug: (role: RbacRole) => void;
   logout: () => void;
 
   // Onboarding Config
@@ -49,10 +62,25 @@ interface AppContextType {
   selectedTenant: TenantScope;
   setSelectedTenant: (tenant: TenantScope) => void;
   tenants: Tenant[];
+  addTenant: (name: string, code: TenantScope, isolationLevel: Tenant['isolationLevel'], rateLimitReqPerMin?: number) => void;
+  updateTenantRateLimit: (code: TenantScope, rateLimitReqPerMin: number) => void;
   
-  // Navigation active dashboard view
-  activeView: 'ingestion' | 'quarantine' | 'lineage' | 'analytics';
-  setActiveView: (view: 'ingestion' | 'quarantine' | 'lineage' | 'analytics') => void;
+  // Navigation active view
+  activeView: ActiveViewType;
+  setActiveView: (view: ActiveViewType) => void;
+
+  // Enterprise Audit Mode & Soft Deletes
+  auditModeActive: boolean;
+  setAuditModeActive: (active: boolean) => void;
+  archivedChunks: ChunkMetadata[];
+
+  // Stage 2: Enterprise Ingestion & Telemetry
+  batchJobs: BatchIngestionJob[];
+  sseLogs: SseTelemetryPayload[];
+  isThrottled: boolean;
+  requestUploadTicket: (fileName: string, fileSize: number, department: TenantScope) => UploadTicketResponse;
+  createBatchJob: (files: File[]) => void;
+  toggleBackpressureThrottling: () => void;
 
   // Active conflict selected for Lineage modal or Diff viewer
   selectedConflictId: string | null;
@@ -68,7 +96,7 @@ interface AppContextType {
   conflicts: QuarantineConflict[];
   resolveConflict: (
     conflictId: string, 
-    action: 'ACCEPTED_INCOMING' | 'KEPT_EXISTING' | 'DISCARDED_BOTH' | 'MANUALLY_MERGED', 
+    action: 'ACCEPTED_INCOMING' | 'PROMOTED_INCOMING_ARCHIVED_OLD' | 'KEPT_EXISTING' | 'DISCARDED_BOTH' | 'MANUALLY_MERGED', 
     mergedText?: string
   ) => void;
 
@@ -79,6 +107,10 @@ interface AppContextType {
 
   // System Telemetry
   telemetry: SystemTelemetry;
+
+  // Audit Logs
+  auditLogs: AuditLogEntry[];
+  addAuditLog: (entry: Omit<AuditLogEntry, 'id' | 'timestamp' | 'integrityHash'>) => void;
 
   // Notifications
   notifications: NotificationItem[];
@@ -97,14 +129,15 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// Initial Default User Profile for immediate testing accessibility
-const DEFAULT_USER: UserProfile = {
-  id: 'usr-901',
-  name: 'Alex Rivera',
-  email: 'alex.rivera@enterprise.ai',
-  role: 'IT_ADMIN',
-  roleLabel: 'IT Admin & Infrastructure Security',
+// Initial Default User Profile (Data Steward HR)
+const DEFAULT_USER: User = {
+  id: 'usr-steward-101',
+  name: 'Sarah Jenkins',
   tenant: 'HR',
+  department: 'HR',
+  role: 'DATA_STEWARD',
+  token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3ItMTAxIiwicm9sZSI6IkRBVEFfU1RFV0FSRCIsInRlbmFudCI6IkhSIiwiaWF0IjoxNTE2MjM5MDIyfQ.signature',
+  email: 'sarah.jenkins@enterprise.ai',
   avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
 };
 
@@ -115,14 +148,15 @@ const DEFAULT_WORKSPACE: WorkspaceConfig = {
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentRoute, setCurrentRoute] = useState<AppRoute>('/');
-  const [user, setUser] = useState<UserProfile | null>(DEFAULT_USER);
+  const [currentRoute, setCurrentRoute] = useState<AppRoute>('/dashboard');
+  const [user, setUser] = useState<User | null>(DEFAULT_USER);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [workspaceConfig, setWorkspaceConfig] = useState<WorkspaceConfig>(DEFAULT_WORKSPACE);
 
-  const [selectedTenant, setSelectedTenant] = useState<TenantScope>('ALL');
-  const [activeView, setActiveView] = useState<'ingestion' | 'quarantine' | 'lineage' | 'analytics'>('quarantine');
-  const [tenants] = useState<Tenant[]>(INITIAL_TENANTS);
+  const [selectedTenant, setSelectedTenant] = useState<TenantScope>('HR');
+  const [activeView, setActiveView] = useState<ActiveViewType>('quarantine');
+  const [tenants, setTenants] = useState<Tenant[]>(INITIAL_TENANTS);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(INITIAL_AUDIT_LOGS);
   const [ingestionQueue, setIngestionQueue] = useState<IngestionItem[]>(INITIAL_INGESTION_QUEUE);
   const [conflicts, setConflicts] = useState<QuarantineConflict[]>(INITIAL_QUARANTINE_CONFLICTS);
   const [selectedConflictId, setSelectedConflictId] = useState<string | null>('conf-8901');
@@ -132,6 +166,241 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [lineageModalConflictId, setLineageModalConflictId] = useState<string | null>(null);
+
+  // Enterprise Audit Mode & Soft-Delete Store
+  const [auditModeActive, setAuditModeActive] = useState<boolean>(false);
+  const [archivedChunks, setArchivedChunks] = useState<ChunkMetadata[]>(INITIAL_ARCHIVED_CHUNKS);
+
+  // Stage 2 State: Batch Ingestion Jobs & SSE Telemetry Logs
+  const [batchJobs, setBatchJobs] = useState<BatchIngestionJob[]>([
+    {
+      jobId: 'batch-9921',
+      batchName: 'Q3_HR_Policy_Batch_2026',
+      department: 'HR',
+      totalFiles: 42,
+      ocrFileCount: 8,
+      nativeFileCount: 34,
+      status: 'SPRING_BATCH_CHUNKING',
+      progressPercentage: 68,
+      chunksCreated: 1450,
+      conflictsFound: 3,
+      throughputChunksPerSec: 185,
+      estimatedTimeRemaining: '24s',
+      createdAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
+      backpressureActive: false
+    }
+  ]);
+
+  const [sseLogs, setSseLogs] = useState<SseTelemetryPayload[]>([
+    {
+      jobId: 'batch-9921',
+      timestamp: '19:26:01',
+      status: 'SPRING_BATCH_CHUNKING',
+      chunksCreated: 1450,
+      conflictsFound: 3,
+      throughputChunksPerSec: 185,
+      estimatedTimeRemaining: '24s',
+      circuitBreakerStatus: 'CLOSED',
+      logMessage: 'SSE Push [batch-9921]: Spring Batch chunker running at 185 chunks/sec.'
+    }
+  ]);
+
+  const [isThrottled, setIsThrottled] = useState(false);
+
+  // Stage 2: Direct-to-Cloud Upload Ticket Request
+  const requestUploadTicket = (fileName: string, _fileSize: number, department: TenantScope): UploadTicketResponse => {
+    const ticketId = `tkt-${Date.now().toString().slice(-6)}`;
+    const cleanTenant = department === 'ALL' || department === 'GLOBAL' ? 'HR' : department;
+    const cleanFileName = fileName.replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const s3Bucket = `enterprise-vector-rag-${cleanTenant.toLowerCase()}-vault`;
+    const s3Key = `uploads/${new Date().getFullYear()}/${cleanFileName}`;
+    const presignedUrl = `https://${s3Bucket}.s3.us-east-1.amazonaws.com/${s3Key}?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIOSFODNN7EXAMPLE%2F20260917%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260917T232600Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4`;
+
+    return {
+      ticketId,
+      presignedUrl,
+      s3Bucket,
+      s3Key,
+      expiresInSeconds: 900,
+      tenantFolder: cleanTenant,
+      maxByteSize: 104857600
+    };
+  };
+
+  // Stage 2: Create Asynchronous Batch Ingestion Job
+  const createBatchJob = (files: File[]) => {
+    if (files.length === 0) return;
+
+    let ocrCount = 0;
+    let nativeCount = 0;
+
+    files.forEach(file => {
+      const isScanned = file.name.toLowerCase().includes('scanned') || file.name.endsWith('.png') || file.name.endsWith('.jpg');
+      if (isScanned) ocrCount++;
+      else nativeCount++;
+      addIngestionFile(file);
+    });
+
+    const targetDept = selectedTenant === 'ALL' ? 'HR' : selectedTenant;
+    const jobId = `batch-${Date.now().toString().slice(-4)}`;
+    const batchName = `${targetDept}_Document_Batch_${new Date().toLocaleTimeString().replace(/:/g, '')}`;
+
+    const newJob: BatchIngestionJob = {
+      jobId,
+      batchName,
+      department: targetDept,
+      totalFiles: files.length,
+      ocrFileCount: ocrCount,
+      nativeFileCount: nativeCount,
+      status: 'UPLOADING_DIRECT_S3',
+      progressPercentage: 15,
+      chunksCreated: 0,
+      conflictsFound: 0,
+      throughputChunksPerSec: 140,
+      estimatedTimeRemaining: '45s',
+      createdAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
+      backpressureActive: isThrottled
+    };
+
+    setBatchJobs(prev => [newJob, ...prev]);
+
+    setSseLogs(prev => [
+      {
+        jobId,
+        timestamp: new Date().toLocaleTimeString(),
+        status: 'UPLOADING_DIRECT_S3',
+        chunksCreated: 0,
+        conflictsFound: 0,
+        throughputChunksPerSec: 140,
+        estimatedTimeRemaining: '45s',
+        circuitBreakerStatus: isThrottled ? 'OPEN' : 'CLOSED',
+        logMessage: `SSE Push [${jobId}]: S3 Presigned URL Tickets issued for ${files.length} documents (${nativeCount} Native Tika, ${ocrCount} OCR Tesseract).`
+      },
+      ...prev
+    ]);
+
+    addAuditLog({
+      actorName: user?.name || 'Data Steward',
+      actorRole: user?.role || 'DATA_STEWARD',
+      department: targetDept,
+      action: 'DOCUMENT_INGEST',
+      targetId: jobId,
+      details: `Dispatched batch ingestion job ${jobId} (${files.length} files: ${nativeCount} Native Tika, ${ocrCount} OCR Tesseract) via Direct-to-Cloud S3 Presigned URLs.`
+    });
+
+    addToast({
+      type: 'info',
+      title: 'Batch Ingestion Initialized',
+      description: `Dispatched ${files.length} documents for ${targetDept} via Direct-to-Cloud S3 ticket pipeline.`
+    });
+  };
+
+  // Stage 2: Toggle Backpressure / AI Circuit Breaker Throttling
+  const toggleBackpressureThrottling = () => {
+    setIsThrottled(prev => {
+      const nextState = !prev;
+      setTelemetry(t => ({
+        ...t,
+        llmCircuitBreakerStatus: nextState ? 'OPEN' : 'CLOSED'
+      }));
+
+      setBatchJobs(jobs => jobs.map(j => ({
+        ...j,
+        status: nextState ? 'THROTTLED' : 'SPRING_BATCH_CHUNKING',
+        backpressureActive: nextState
+      })));
+
+      addToast({
+        type: nextState ? 'amber' : 'success',
+        title: nextState ? 'AI Rate Limit Throttling Active' : 'Circuit Breaker Reset',
+        description: nextState 
+          ? 'RabbitMQ queue backpressure detected. Dashboard shifted to THROTTLED warning mode.'
+          : 'Backpressure cleared. Pipeline resumed high-throughput processing.'
+      });
+
+      return nextState;
+    });
+  };
+
+  // Enforced tenant selection helper for RBAC isolation
+  const handleSetSelectedTenant = (tenant: TenantScope) => {
+    if (user?.role === 'DATA_STEWARD' && user.tenant !== 'GLOBAL') {
+      const allowedTenant = user.tenant as TenantScope;
+      if (tenant !== allowedTenant && tenant !== 'ALL') {
+        addToast({
+          type: 'rose',
+          title: 'Tenant Scope Restricted',
+          description: `Data Steward (${user.name}) is restricted to ${allowedTenant} department context.`
+        });
+        setSelectedTenant(allowedTenant);
+        return;
+      }
+    }
+    setSelectedTenant(tenant);
+  };
+
+  // Audit Log Helper
+  const addAuditLog = (entry: Omit<AuditLogEntry, 'id' | 'timestamp' | 'integrityHash'>) => {
+    const id = `aud-${Date.now().toString().slice(-4)}`;
+    const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    const mockHash = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10) + Date.now().toString(16);
+    
+    setAuditLogs(prev => [
+      {
+        ...entry,
+        id,
+        timestamp,
+        integrityHash: mockHash
+      },
+      ...prev
+    ]);
+  };
+
+  // Add Tenant (System Admin action)
+  const addTenant = (name: string, code: TenantScope, isolationLevel: Tenant['isolationLevel'], rateLimitReqPerMin = 600) => {
+    const newTenant: Tenant = {
+      id: `t-${code.toLowerCase()}`,
+      name,
+      code,
+      isolationLevel,
+      activeConflictsCount: 0,
+      totalIngestedDocs: 0,
+      rateLimitReqPerMin,
+      storageUsedGb: 0.1
+    };
+    setTenants(prev => [...prev, newTenant]);
+    addAuditLog({
+      actorName: user?.name || 'System Admin',
+      actorRole: user?.role || 'SYSTEM_ADMIN',
+      department: 'GLOBAL',
+      action: 'TENANT_CREATE',
+      targetId: newTenant.id,
+      details: `Created new department tenant "${name}" (${code}) with ${isolationLevel}.`
+    });
+    addToast({
+      type: 'success',
+      title: 'Tenant Created Successfully',
+      description: `Tenant ${name} initialized with ${isolationLevel}.`
+    });
+  };
+
+  // Update Tenant Rate Limit
+  const updateTenantRateLimit = (code: TenantScope, rateLimitReqPerMin: number) => {
+    setTenants(prev => prev.map(t => t.code === code ? { ...t, rateLimitReqPerMin } : t));
+    addAuditLog({
+      actorName: user?.name || 'System Admin',
+      actorRole: user?.role || 'SYSTEM_ADMIN',
+      department: 'GLOBAL',
+      action: 'RATE_LIMIT_CHANGE',
+      targetId: String(code),
+      details: `Updated ${code} worker rate limit to ${rateLimitReqPerMin} req/min.`
+    });
+    addToast({
+      type: 'info',
+      title: 'Rate Limit Updated',
+      description: `Rate limit for ${code} set to ${rateLimitReqPerMin} req/min.`
+    });
+  };
 
   // Toast Helper
   const addToast = (toast: Omit<ToastMessage, 'id'>) => {
@@ -153,7 +422,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addToast({
         type: 'amber',
         title: 'Authentication Required',
-        description: 'Please sign in or select a profile role to access the workspace.'
+        description: 'Please log in with an authorized JWT token.'
       });
       setCurrentRoute('/login');
       return;
@@ -162,65 +431,136 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Role Label Formatting Helper
-  const getRoleLabel = (role: UserRole): string => {
-    switch (role) {
-      case 'IT_ADMIN': return 'IT Admin & Infra Security';
-      case 'COMPLIANCE_AUDITOR': return 'Compliance & Regulatory Auditor';
-      case 'AI_ARCHITECT': return 'Lead AI & RAG Architect';
-      case 'LEGAL_COUNSEL': return 'Enterprise Legal Counsel';
-      default: return role;
-    }
+  // Mock JWT Token Builder synchronized with Java Backend secret key
+  const generateMockJwt = (role: RbacRole, tenant: RbacTenant) => {
+    const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+    const payload = btoa(JSON.stringify({
+      sub: `usr-${Date.now().toString().slice(-4)}`,
+      role: role,
+      tenant: tenant,
+      tenantId: tenant,
+      iat: Math.floor(Date.now() / 1000)
+    }));
+    const mockSecret = import.meta.env.VITE_JWT_SECRET || 'aXRzLWEtc2VjcmV0LWtleS10aGF0LW11c3QtYmUtYXQtbGVhc3QtMjU2LWJpdHMtbG9uZw==';
+    const mockSignature = btoa(mockSecret.slice(0, 16) + `_${role}_${tenant}`);
+    return `${header}.${payload}.${mockSignature}`;
   };
 
-  // Auth Methods
-  const login = (email: string, _password: string, role: UserRole, tenant: TenantScope) => {
+  // Mock Login Behavior 1: Data Steward (HR)
+  const loginAsDataSteward = () => {
+    const newUser: User = {
+      id: 'usr-steward-101',
+      name: 'Sarah Jenkins',
+      tenant: 'HR',
+      role: 'DATA_STEWARD',
+      token: generateMockJwt('DATA_STEWARD', 'HR'),
+      email: 'sarah.jenkins@enterprise.ai',
+      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
+    };
+    setUser(newUser);
+    setIsAuthenticated(true);
+    setSelectedTenant('HR');
+    setActiveView('quarantine');
+    addToast({
+      type: 'success',
+      title: 'Logged in as Data Steward (HR)',
+      description: 'JWT Issued. Redirecting to Quarantine Queue.'
+    });
+    navigate('/dashboard');
+  };
+
+  // Mock Login Behavior 2: System Admin (GLOBAL)
+  const loginAsSystemAdmin = () => {
+    const newUser: User = {
+      id: 'usr-admin-102',
+      name: 'Alex Rivera',
+      tenant: 'GLOBAL',
+      role: 'SYSTEM_ADMIN',
+      token: generateMockJwt('SYSTEM_ADMIN', 'GLOBAL'),
+      email: 'alex.rivera@enterprise.ai',
+      avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'
+    };
+    setUser(newUser);
+    setIsAuthenticated(true);
+    setSelectedTenant('ALL');
+    setActiveView('analytics');
+    addToast({
+      type: 'success',
+      title: 'Logged in as System Admin (GLOBAL)',
+      description: 'JWT Issued. Redirecting to Global Health & Infrastructure metrics.'
+    });
+    navigate('/dashboard');
+  };
+
+  // Mock Login Behavior 3: Compliance Auditor (GLOBAL)
+  const loginAsAuditor = () => {
+    const newUser: User = {
+      id: 'usr-auditor-103',
+      name: 'Marcus Vance',
+      tenant: 'GLOBAL',
+      role: 'COMPLIANCE_AUDITOR',
+      token: generateMockJwt('COMPLIANCE_AUDITOR', 'GLOBAL'),
+      email: 'marcus.vance@legal.ai',
+      avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80'
+    };
+    setUser(newUser);
+    setIsAuthenticated(true);
+    setSelectedTenant('ALL');
+    setActiveView('lineage');
+    addToast({
+      type: 'success',
+      title: 'Logged in as Compliance Auditor (GLOBAL)',
+      description: 'JWT Issued. Redirecting to Vector Lineage Traceability.'
+    });
+    navigate('/dashboard');
+  };
+
+  const loginWithProfile = (email: string, role: RbacRole, tenant: RbacTenant) => {
     const userName = email.split('@')[0].replace('.', ' ').replace(/^./, str => str.toUpperCase());
-    const newUser: UserProfile = {
+    const newUser: User = {
       id: `usr-${Date.now().toString().slice(-4)}`,
-      name: userName || 'Enterprise Admin',
+      name: userName || 'Enterprise User',
       email,
       role,
-      roleLabel: getRoleLabel(role),
       tenant,
+      token: generateMockJwt(role, tenant),
       avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`
     };
-
     setUser(newUser);
     setIsAuthenticated(true);
-    if (tenant !== 'ALL') setSelectedTenant(tenant);
+    if (tenant !== 'GLOBAL') setSelectedTenant(tenant as TenantScope);
 
     addToast({
       type: 'success',
-      title: 'Authentication Successful',
-      description: `Logged in as ${newUser.name} (${newUser.roleLabel}) in ${tenant} scope.`
+      title: 'JWT Authentication Issued',
+      description: `Authenticated as ${newUser.name} (${role} - ${tenant}).`
     });
-
-    navigate('/onboarding');
+    navigate('/dashboard');
   };
 
-  const signup = (name: string, email: string, _password: string, role: UserRole, tenant: TenantScope) => {
-    const newUser: UserProfile = {
-      id: `usr-${Date.now().toString().slice(-4)}`,
-      name,
-      email,
+  // Debug Role Switcher for live UI testing
+  const setRoleDebug = (role: RbacRole) => {
+    if (!user) return;
+    const tenant: RbacTenant = role === 'DATA_STEWARD' ? 'HR' : 'GLOBAL';
+    const updatedUser: User = {
+      ...user,
       role,
-      roleLabel: getRoleLabel(role),
       tenant,
-      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`
+      token: generateMockJwt(role, tenant)
     };
-
-    setUser(newUser);
-    setIsAuthenticated(true);
-    if (tenant !== 'ALL') setSelectedTenant(tenant);
+    setUser(updatedUser);
+    if (tenant !== 'GLOBAL') setSelectedTenant(tenant as TenantScope);
+    
+    // Auto-swap default view
+    if (role === 'DATA_STEWARD') setActiveView('quarantine');
+    else if (role === 'SYSTEM_ADMIN') setActiveView('analytics');
+    else if (role === 'COMPLIANCE_AUDITOR') setActiveView('lineage');
 
     addToast({
-      type: 'success',
-      title: 'Enterprise Account Created',
-      description: `Welcome ${name}! Department scope set to ${tenant}.`
+      type: 'info',
+      title: `Persona Switched to ${role}`,
+      description: `Swapped dashboard layout and tenant scope to ${tenant}.`
     });
-
-    navigate('/onboarding');
   };
 
   const logout = () => {
@@ -229,7 +569,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast({
       type: 'info',
       title: 'Logged Out',
-      description: 'You have been signed out of your enterprise session.'
+      description: 'JWT Token revoked. Session terminated.'
     });
     navigate('/login');
   };
@@ -242,8 +582,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     addToast({
       type: 'success',
-      title: 'Workspace Configured',
-      description: `"${workspaceName}" is initialized and connected to ${targetVectorDb}.`
+      title: 'Workspace Initialized',
+      description: `"${workspaceName}" target set to ${targetVectorDb}.`
     });
     navigate('/dashboard');
   };
@@ -317,7 +657,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast({
       type: 'rose',
       title: 'Queue Item Cancelled',
-      description: 'Ingestion pipeline execution aborted for document.'
+      description: 'Ingestion pipeline execution aborted.'
     });
   };
 
@@ -325,18 +665,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIngestionQueue([]);
   };
 
-  // Resolve Quarantine Conflict
+  // Resolve Quarantine Conflict with Soft-Delete Archiving
   const resolveConflict = (
     conflictId: string, 
-    action: 'ACCEPTED_INCOMING' | 'KEPT_EXISTING' | 'DISCARDED_BOTH' | 'MANUALLY_MERGED', 
+    action: 'ACCEPTED_INCOMING' | 'PROMOTED_INCOMING_ARCHIVED_OLD' | 'KEPT_EXISTING' | 'DISCARDED_BOTH' | 'MANUALLY_MERGED', 
     mergedText?: string
   ) => {
+    const conflictToResolve = conflicts.find(c => c.id === conflictId);
+    if (conflictToResolve && (action === 'PROMOTED_INCOMING_ARCHIVED_OLD' || action === 'ACCEPTED_INCOMING')) {
+      const archivedItem: ChunkMetadata = {
+        ...conflictToResolve.existingChunk,
+        temporalStatus: 'Archived',
+        effectiveDate: `${conflictToResolve.existingChunk.uploadDate} to ${new Date().toISOString().slice(0, 10)}`
+      };
+      setArchivedChunks(prev => [archivedItem, ...prev]);
+    }
+
     setConflicts(prev => 
       prev.map(c => {
         if (c.id === conflictId) {
+          const updatedIncoming = {
+            ...c.incomingChunk,
+            temporalStatus: (action === 'PROMOTED_INCOMING_ARCHIVED_OLD' || action === 'ACCEPTED_INCOMING') ? ('Active' as const) : c.incomingChunk.temporalStatus,
+            effectiveDate: (action === 'PROMOTED_INCOMING_ARCHIVED_OLD' || action === 'ACCEPTED_INCOMING') ? `${new Date().toISOString().slice(0, 10)} to Present` : c.incomingChunk.effectiveDate
+          };
           return {
             ...c,
             status: action,
+            incomingChunk: updatedIncoming,
             mergedText: mergedText || c.mergedText
           };
         }
@@ -349,28 +705,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...prev,
       quarantinedPendingCount: Math.max(0, prev.quarantinedPendingCount - 1),
       quarantinedResolvedCount: prev.quarantinedResolvedCount + 1,
-      exactDuplicatesPruned: action === 'ACCEPTED_INCOMING' ? prev.exactDuplicatesPruned + 1 : prev.exactDuplicatesPruned,
+      exactDuplicatesPruned: (action === 'ACCEPTED_INCOMING' || action === 'PROMOTED_INCOMING_ARCHIVED_OLD') ? prev.exactDuplicatesPruned + 1 : prev.exactDuplicatesPruned,
       vectorRamSavedGb: Number((prev.vectorRamSavedGb + 0.012).toFixed(3))
     }));
 
-    const toastTitles: Record<string, string> = {
-      'ACCEPTED_INCOMING': 'Incoming Chunk Accepted (Legacy Pruned)',
-      'KEPT_EXISTING': 'Existing Chunk Retained (Incoming Discarded)',
-      'DISCARDED_BOTH': 'Both Chunks Purged from Vector DB',
-      'MANUALLY_MERGED': 'Reconciled Chunk Committed to Vector DB'
-    };
+    if (action === 'PROMOTED_INCOMING_ARCHIVED_OLD' || action === 'ACCEPTED_INCOMING') {
+      addToast({
+        type: 'success',
+        title: 'Chunk Promoted & Soft-Archived',
+        description: 'The existing chunk has been safely archived for audit compliance, and the new chunk is now Active.'
+      });
+    } else {
+      const toastTitles: Record<string, string> = {
+        'KEPT_EXISTING': 'Existing Chunk Retained (Incoming Discarded)',
+        'DISCARDED_BOTH': 'Both Chunks Purged from Vector DB',
+        'MANUALLY_MERGED': 'Reconciled Chunk Committed to Vector DB'
+      };
 
-    const toastTypes: Record<string, 'success' | 'amber' | 'rose' | 'info'> = {
-      'ACCEPTED_INCOMING': 'success',
-      'KEPT_EXISTING': 'amber',
-      'DISCARDED_BOTH': 'rose',
-      'MANUALLY_MERGED': 'info'
-    };
+      const toastTypes: Record<string, 'success' | 'amber' | 'rose' | 'info'> = {
+        'KEPT_EXISTING': 'amber',
+        'DISCARDED_BOTH': 'rose',
+        'MANUALLY_MERGED': 'info'
+      };
 
-    addToast({
-      type: toastTypes[action] || 'success',
-      title: toastTitles[action] || 'Quarantine Action Executed',
-      description: `Conflict ${conflictId} updated. Vector database index updated with high accuracy provenance tag.`
+      addToast({
+        type: toastTypes[action] || 'success',
+        title: toastTitles[action] || 'Quarantine Action Executed',
+        description: `Conflict ${conflictId} updated. Vector database index synced.`
+      });
+    }
+
+    addAuditLog({
+      actorName: user?.name || 'Data Steward',
+      actorRole: user?.role || 'DATA_STEWARD',
+      department: conflictToResolve?.department || selectedTenant,
+      action: action === 'PROMOTED_INCOMING_ARCHIVED_OLD' ? 'RESOLVE_ACCEPT' : 'RESOLVE_KEEP',
+      targetId: conflictId,
+      details: (action === 'PROMOTED_INCOMING_ARCHIVED_OLD' || action === 'ACCEPTED_INCOMING')
+        ? `Soft-archived legacy chunk ${conflictToResolve?.existingChunk.id} and promoted incoming chunk ${conflictToResolve?.incomingChunk.id} to Active status.`
+        : `Executed action ${action} on conflict ${conflictId}.`
     });
 
     // Select next pending conflict if available
@@ -394,16 +767,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       navigate,
       user,
       isAuthenticated,
-      login,
-      signup,
+      token: user?.token || null,
+      loginAsDataSteward,
+      loginAsSystemAdmin,
+      loginAsAuditor,
+      loginWithProfile,
+      setRoleDebug,
       logout,
       workspaceConfig,
       completeOnboarding,
       selectedTenant,
-      setSelectedTenant,
+      setSelectedTenant: handleSetSelectedTenant,
       tenants,
+      addTenant,
+      updateTenantRateLimit,
       activeView,
       setActiveView,
+      auditModeActive,
+      setAuditModeActive,
+      archivedChunks,
+      batchJobs,
+      sseLogs,
+      isThrottled,
+      requestUploadTicket,
+      createBatchJob,
+      toggleBackpressureThrottling,
       selectedConflictId,
       setSelectedConflictId,
       ingestionQueue,
@@ -416,6 +804,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       selectedClusterId,
       setSelectedClusterId,
       telemetry,
+      auditLogs,
+      addAuditLog,
       notifications,
       markNotificationAsRead,
       clearNotifications,
@@ -434,4 +824,19 @@ export const useApp = () => {
   const context = useContext(AppContext);
   if (!context) throw new Error('useApp must be used within an AppProvider');
   return context;
+};
+
+// Zustand-Style Export Hook for explicit useAuthStore() compliance
+export const useAuthStore = () => {
+  const { user, isAuthenticated, token, loginAsDataSteward, loginAsSystemAdmin, loginAsAuditor, logout, setRoleDebug } = useApp();
+  return {
+    user,
+    isAuthenticated,
+    token,
+    loginAsDataSteward,
+    loginAsSystemAdmin,
+    loginAsAuditor,
+    logout,
+    setRoleDebug
+  };
 };

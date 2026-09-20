@@ -1,6 +1,7 @@
 import React from 'react';
-import { FileText, Calendar, User, Database, Hash, ArrowUpRight, ArrowDownRight, Tag } from 'lucide-react';
+import { FileText, Calendar, User, Database, Hash, ArrowUpRight, ArrowDownRight, Lock, Clock, CheckCircle2, ShieldAlert } from 'lucide-react';
 import type { ChunkMetadata } from '../../types';
+import { useApp } from '../../context/AppContext';
 
 interface SideBySideDiffProps {
   existingChunk: ChunkMetadata;
@@ -8,6 +9,8 @@ interface SideBySideDiffProps {
 }
 
 export const SideBySideDiff: React.FC<SideBySideDiffProps> = ({ existingChunk, incomingChunk }) => {
+  const { user } = useApp();
+  const isAdmin = user?.role === 'SYSTEM_ADMIN';
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Left Card: Existing Chunk A (Legacy Vector Store Candidate) */}
@@ -15,14 +18,20 @@ export const SideBySideDiff: React.FC<SideBySideDiffProps> = ({ existingChunk, i
         {/* Top Header Badge */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
             <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
               Existing Vector Chunk A (In Vector DB)
             </span>
           </div>
-          <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-mono">
-            {existingChunk.docYear} Baseline
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+              {existingChunk.temporalStatus || 'Active'}
+            </span>
+            <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-mono">
+              {existingChunk.docYear} Baseline
+            </span>
+          </div>
         </div>
 
         {/* Document Metadata Grid */}
@@ -47,9 +56,9 @@ export const SideBySideDiff: React.FC<SideBySideDiffProps> = ({ existingChunk, i
           </div>
           <div>
             <div className="text-[10px] text-slate-500 flex items-center gap-1">
-              <Tag className="w-3 h-3 text-emerald-400" /> Tenant Scope
+              <Clock className="w-3 h-3 text-emerald-400" /> Effective Range
             </div>
-            <div className="text-slate-200 mt-0.5">{existingChunk.tenantId}</div>
+            <div className="text-emerald-300 font-semibold mt-0.5 truncate">{existingChunk.effectiveDate || `${existingChunk.uploadDate} to Present`}</div>
           </div>
         </div>
 
@@ -62,7 +71,17 @@ export const SideBySideDiff: React.FC<SideBySideDiffProps> = ({ existingChunk, i
             </span>
           </div>
           <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 font-mono leading-relaxed min-h-[140px] whitespace-pre-wrap">
-            {existingChunk.highlightedDiffRanges ? (
+            {isAdmin ? (
+              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 font-mono text-xs flex items-center justify-center gap-2 h-28 text-center">
+                <Lock className="w-5 h-5 text-amber-400 shrink-0" />
+                <div>
+                  <div className="font-bold text-amber-300">[RESTRICTED_DATA - TENANT PRIVACY ENFORCED]</div>
+                  <div className="text-[10px] text-slate-400 font-normal mt-0.5">
+                    System Admins can only view document metadata. Raw chunk text is restricted by zero-trust RBAC policy.
+                  </div>
+                </div>
+              </div>
+            ) : existingChunk.highlightedDiffRanges ? (
               existingChunk.highlightedDiffRanges.map((range, idx) => (
                 <span 
                   key={idx}
@@ -98,9 +117,15 @@ export const SideBySideDiff: React.FC<SideBySideDiffProps> = ({ existingChunk, i
               Incoming Chunk B (Quarantined Pipeline)
             </span>
           </div>
-          <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 text-[10px] font-mono">
-            {incomingChunk.docYear} Revision
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] font-mono font-bold flex items-center gap-1">
+              <ShieldAlert className="w-3 h-3 text-amber-400" />
+              {incomingChunk.temporalStatus || 'Quarantined'}
+            </span>
+            <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 text-[10px] font-mono">
+              {incomingChunk.docYear} Revision
+            </span>
+          </div>
         </div>
 
         {/* Document Metadata Grid */}
@@ -125,9 +150,9 @@ export const SideBySideDiff: React.FC<SideBySideDiffProps> = ({ existingChunk, i
           </div>
           <div>
             <div className="text-[10px] text-slate-500 flex items-center gap-1">
-              <Tag className="w-3 h-3 text-emerald-400" /> Tenant Scope
+              <Clock className="w-3 h-3 text-cyan-400" /> Target Effective Date
             </div>
-            <div className="text-slate-200 mt-0.5">{incomingChunk.tenantId}</div>
+            <div className="text-cyan-300 font-semibold mt-0.5 truncate">{incomingChunk.effectiveDate || `${incomingChunk.uploadDate} (Pending)`}</div>
           </div>
         </div>
 
@@ -140,7 +165,17 @@ export const SideBySideDiff: React.FC<SideBySideDiffProps> = ({ existingChunk, i
             </span>
           </div>
           <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 font-mono leading-relaxed min-h-[140px] whitespace-pre-wrap">
-            {incomingChunk.highlightedDiffRanges ? (
+            {isAdmin ? (
+              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 font-mono text-xs flex items-center justify-center gap-2 h-28 text-center">
+                <Lock className="w-5 h-5 text-amber-400 shrink-0" />
+                <div>
+                  <div className="font-bold text-amber-300">[RESTRICTED_DATA - TENANT PRIVACY ENFORCED]</div>
+                  <div className="text-[10px] text-slate-400 font-normal mt-0.5">
+                    System Admins can only view document metadata. Raw chunk text is restricted by zero-trust RBAC policy.
+                  </div>
+                </div>
+              </div>
+            ) : incomingChunk.highlightedDiffRanges ? (
               incomingChunk.highlightedDiffRanges.map((range, idx) => (
                 <span 
                   key={idx}
