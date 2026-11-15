@@ -1,0 +1,1 @@
+ALTER TABLE compliance_audit_log ADD COLUMN IF NOT EXISTS actor_id VARCHAR(64);

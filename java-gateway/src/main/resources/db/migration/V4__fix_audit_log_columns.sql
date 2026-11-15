@@ -1,0 +1,2 @@
+ALTER TABLE compliance_audit_log ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE compliance_audit_log ALTER COLUMN actor_name DROP NOT NULL;
