@@ -26,6 +26,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final RedisRateLimitingFilter redisRateLimitingFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -55,7 +56,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/**").authenticated()
                 .anyRequest().permitAll()
             )
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(redisRateLimitingFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }
