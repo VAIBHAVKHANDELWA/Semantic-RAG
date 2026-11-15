@@ -28,51 +28,15 @@ class DatabaseService:
 
     def _init_db(self):
         """
-        Ensures pgvector extension and relational/vector tables exist on startup.
+        Validates database connectivity. Schema and migrations are managed exclusively by Flyway.
         """
         try:
             with self.get_connection() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-                    
-                    # 1. Vector Store Table (Clean Vector Index)
-                    cur.execute("""
-                        CREATE TABLE IF NOT EXISTS vector_chunks (
-                            id VARCHAR(64) PRIMARY KEY,
-                            doc_name VARCHAR(255) NOT NULL,
-                            tenant_id VARCHAR(64) NOT NULL,
-                            chunk_text TEXT NOT NULL,
-                            embedding vector(384) NOT NULL,
-                            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                        );
-                    """)
-                    
-                    # Create HNSW index on pgvector column if absent
-                    cur.execute("""
-                        CREATE INDEX IF NOT EXISTS idx_vector_chunks_tenant 
-                        ON vector_chunks (tenant_id);
-                    """)
-
-                    # 2. Quarantine Queue Table (Flagged Policy Collisions)
-                    cur.execute("""
-                        CREATE TABLE IF NOT EXISTS quarantine_queue (
-                            id VARCHAR(64) PRIMARY KEY,
-                            job_id VARCHAR(64) NOT NULL,
-                            tenant_id VARCHAR(64) NOT NULL,
-                            similarity_score FLOAT NOT NULL,
-                            verdict_type VARCHAR(64) NOT NULL,
-                            contradiction_explanation TEXT NOT NULL,
-                            existing_chunk_id VARCHAR(64),
-                            existing_chunk_text TEXT,
-                            incoming_chunk_text TEXT NOT NULL,
-                            status VARCHAR(32) DEFAULT 'PENDING',
-                            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                        );
-                    """)
-                conn.commit()
-                logger.info("Successfully initialized PostgreSQL schema with pgvector extension & tables.")
+                    cur.execute("SELECT 1;")
+                logger.info("PostgreSQL database connection verified. Schema managed by Flyway.")
         except Exception as e:
-            logger.error(f"Failed to initialize database schema: {str(e)}", exc_info=True)
+            logger.warning(f"Database connection check during init: {str(e)} (Will retry during runtime queries)")
 
     def search_and_route_chunk(
         self, 

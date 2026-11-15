@@ -9,47 +9,59 @@ spring:
       max-file-size: 100MB
       max-request-size: 100MB
   rabbitmq:
-    host: localhost
-    port: 5672
-    username: admin
-    password: adminpassword
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:admin}
+    password: ${SPRING_RABBITMQ_PASSWORD:adminpassword}
     listener:
       simple:
         retry:
           enabled: true
           initial-interval: 3000ms
   datasource:
-    url: jdbc:postgresql://localhost:5432/semantic_rag_db
-    username: admin
-    password: adminpassword
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/semantic_rag_db}
+    username: ${SPRING_DATASOURCE_USERNAME:admin}
+    password: ${SPRING_DATASOURCE_PASSWORD:adminpassword}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2
       idle-timeout: 300000
       connection-timeout: 20000
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      ddl-auto: validate
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
 jwt:
-  secret: aXRzLWEtc2VjcmV0LWtleS10aGF0LW11c3QtYmUtYXQtbGVhc3QtMjU2LWJpdHMtbG9uZw==
+  secret: ${JWT_SECRET:aXRzLWEtc2VjcmV0LWtleS10aGF0LW11c3QtYmUtYXQtbGVhc3QtMjU2LWJpdHMtbG9uZw==}
+  expiration-ms: 86400000 # 24 hours
 
 cloud:
   s3:
-    endpoint: http://localhost:9000
-    access-key: minioadmin
-    secret-key: minioadmin
-    bucket-name: semantic-rag-uploads
-    region: us-east-1
+    endpoint: ${CLOUD_S3_ENDPOINT:http://localhost:9000}
+    access-key: ${CLOUD_S3_ACCESS_KEY:minioadmin}
+    secret-key: ${CLOUD_S3_SECRET_KEY:minioadmin}
+    bucket-name: ${CLOUD_S3_BUCKET_NAME:semantic-rag-uploads}
+    region: ${CLOUD_S3_REGION:us-east-1}
+
+tika:
+  endpoint: ${TIKA_ENDPOINT:http://localhost:9998}
 
 logging:
   level:
     root: INFO
-    com.middleware.gateway: DEBUG
-    org.springframework.security: DEBUG
+    com.middleware.gateway: INFO
+    org.springframework.security: WARN
