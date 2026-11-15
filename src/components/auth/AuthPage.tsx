@@ -22,23 +22,41 @@ interface AuthPageProps {
 
 export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
   const { 
-    loginWithProfile, 
-    loginAsDataSteward, 
-    loginAsSystemAdmin, 
-    loginAsAuditor, 
+    loginWithCredentials,
     navigate 
   } = useApp();
 
   const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('alex.rivera@enterprise.ai');
-  const [password, setPassword] = useState('••••••••••••');
-  const [role, setRole] = useState<RbacRole>('DATA_STEWARD');
-  const [tenant, setTenant] = useState<RbacTenant>('HR');
+  const [email, setEmail] = useState('hr_steward@enterprise.com');
+  const [password, setPassword] = useState('password123');
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    loginWithProfile(email, role, tenant);
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      await loginWithCredentials(email, password);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Login failed. Please check credentials.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleQuickPersona = async (pEmail: string) => {
+    setIsLoading(true);
+    setErrorMessage(null);
+    setEmail(pEmail);
+    setPassword('password123');
+    try {
+      await loginWithCredentials(pEmail, 'password123');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Quick login failed.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -62,32 +80,40 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
             <Network className="w-6 h-6 text-white" />
           </div>
           <h2 className="text-2xl font-bold text-slate-100">
-            {mode === 'login' ? 'JWT Enterprise Sign In' : 'Create Middleware Account'}
+            Enterprise JWT Authentication
           </h2>
           <p className="text-xs text-slate-400">
-            Enforce Role-Based Access Control (RBAC) & multi-tenant isolation.
+            Zero-trust Role-Based Access Control (RBAC) & tenant isolation gateway.
           </p>
         </div>
 
-        {/* 1-CLICK QUICK PERSONA LOGIN BUTTONS (REQUIRED BY PROMPT) */}
+        {errorMessage && (
+          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-mono">
+            {errorMessage}
+          </div>
+        )}
+
+        {/* 1-CLICK QUICK PERSONA LOGIN BUTTONS */}
         <div className="space-y-2 p-4 rounded-2xl bg-slate-950/80 border border-cyan-500/30 glow-cyan">
           <div className="text-[11px] font-mono text-cyan-300 font-bold uppercase tracking-wider text-center flex items-center justify-center gap-1.5">
-            <Key className="w-3.5 h-3.5 text-cyan-400" /> Instant Quick-Select Personas (Mock JWT)
+            <Key className="w-3.5 h-3.5 text-cyan-400" /> Instant Role Personas (Gateway API)
           </div>
 
           <div className="space-y-2 text-xs">
             {/* Button 1: Data Steward (HR) */}
             <button
-              onClick={loginAsDataSteward}
-              className="w-full p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-cyan-500/40 text-slate-200 text-left flex items-center justify-between transition-all group"
+              type="button"
+              disabled={isLoading}
+              onClick={() => handleQuickPersona('hr_steward@enterprise.com')}
+              className="w-full p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-cyan-500/40 text-slate-200 text-left flex items-center justify-between transition-all group disabled:opacity-50"
             >
               <div className="flex items-center gap-2.5">
                 <div className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-300">
                   <UserCheck className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="font-bold text-cyan-300">Login as Data Steward (HR)</div>
-                  <div className="text-[10px] text-slate-500 font-mono">Quarantine Queue & Tenant Vector Health</div>
+                  <div className="font-bold text-cyan-300">Data Steward (HR Department)</div>
+                  <div className="text-[10px] text-slate-500 font-mono">hr_steward@enterprise.com</div>
                 </div>
               </div>
               <ArrowRight className="w-4 h-4 text-cyan-400 group-hover:translate-x-1 transition-transform" />
@@ -95,16 +121,18 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
 
             {/* Button 2: System Admin */}
             <button
-              onClick={loginAsSystemAdmin}
-              className="w-full p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-slate-200 text-left flex items-center justify-between transition-all group"
+              type="button"
+              disabled={isLoading}
+              onClick={() => handleQuickPersona('hr_admin@enterprise.com')}
+              className="w-full p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-slate-200 text-left flex items-center justify-between transition-all group disabled:opacity-50"
             >
               <div className="flex items-center gap-2.5">
                 <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-300">
                   <Activity className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="font-bold text-amber-300">Login as System Admin</div>
-                  <div className="text-[10px] text-slate-500 font-mono">LLM API Costs, Cache Hits & Backpressure</div>
+                  <div className="font-bold text-amber-300">System Admin (Full Privileges)</div>
+                  <div className="text-[10px] text-slate-500 font-mono">hr_admin@enterprise.com</div>
                 </div>
               </div>
               <ArrowRight className="w-4 h-4 text-amber-400 group-hover:translate-x-1 transition-transform" />
@@ -112,16 +140,18 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
 
             {/* Button 3: Compliance Auditor */}
             <button
-              onClick={loginAsAuditor}
-              className="w-full p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-purple-500/40 text-slate-200 text-left flex items-center justify-between transition-all group"
+              type="button"
+              disabled={isLoading}
+              onClick={() => handleQuickPersona('legal_auditor@enterprise.com')}
+              className="w-full p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-purple-500/40 text-slate-200 text-left flex items-center justify-between transition-all group disabled:opacity-50"
             >
               <div className="flex items-center gap-2.5">
                 <div className="p-1.5 rounded-lg bg-purple-500/20 text-purple-300">
                   <FileCheck className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="font-bold text-purple-300">Login as Auditor</div>
-                  <div className="text-[10px] text-slate-500 font-mono">Centered Vector Lineage Search & Provenance</div>
+                  <div className="font-bold text-purple-300">Compliance Auditor (Legal Scope)</div>
+                  <div className="text-[10px] text-slate-500 font-mono">legal_auditor@enterprise.com</div>
                 </div>
               </div>
               <ArrowRight className="w-4 h-4 text-purple-400 group-hover:translate-x-1 transition-transform" />
@@ -129,123 +159,49 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
           </div>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex items-center rounded-xl bg-slate-950 p-1 border border-slate-800 font-medium text-xs">
-          <button
-            onClick={() => setMode('login')}
-            className={`flex-1 py-2 rounded-lg transition-all ${
-              mode === 'login' 
-                ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30' 
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Custom Sign In
-          </button>
-          <button
-            onClick={() => setMode('signup')}
-            className={`flex-1 py-2 rounded-lg transition-all ${
-              mode === 'signup' 
-                ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30' 
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Custom Register
-          </button>
-        </div>
-
-        {/* Custom Auth Form */}
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-          {mode === 'signup' && (
-            <div>
-              <label className="block text-slate-400 mb-1 font-medium">Full Name</label>
-              <div className="relative">
-                <UserIcon className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  placeholder="e.g. Sarah Jenkins"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  className="w-full rounded-xl bg-slate-950 border border-slate-800 pl-9 pr-4 py-2.5 text-slate-200 focus:outline-none focus:border-cyan-500/50"
-                  required
-                />
-              </div>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-slate-400 mb-1 font-medium">Corporate Email</label>
-            <div className="relative">
-              <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-              <input
-                type="email"
-                placeholder="name@enterprise.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                className="w-full rounded-xl bg-slate-950 border border-slate-800 pl-9 pr-4 py-2.5 text-slate-200 focus:outline-none focus:border-cyan-500/50"
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-slate-400 mb-1 font-medium">Password</label>
-            <div className="relative">
-              <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-              <input
-                type="password"
-                placeholder="••••••••••••"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                className="w-full rounded-xl bg-slate-950 border border-slate-800 pl-9 pr-4 py-2.5 text-slate-200 focus:outline-none focus:border-cyan-500/50"
-                required
-              />
-            </div>
-          </div>
-
-          {/* Profile Role Selector */}
-          <div>
-            <label className="block text-slate-300 font-semibold mb-1 flex items-center justify-between">
-              <span>Select RBAC Persona</span>
-              <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+        {/* Traditional Credentials Form */}
+        <form onSubmit={handleFormSubmit} className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-xs text-slate-400 font-mono flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5 text-cyan-400" /> Enterprise Work Email
             </label>
-            <select
-              value={role}
-              onChange={e => setRole(e.target.value as RbacRole)}
-              className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2.5 text-slate-200 focus:outline-none focus:border-cyan-500/50 font-mono"
-            >
-              <option value="DATA_STEWARD">DATA_STEWARD (HR / Department Vector Health)</option>
-              <option value="SYSTEM_ADMIN">SYSTEM_ADMIN (Global Telemetry & API Cost)</option>
-              <option value="COMPLIANCE_AUDITOR">COMPLIANCE_AUDITOR (Vector Lineage Search)</option>
-            </select>
+            <input 
+              type="email" 
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="user@enterprise.com"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-500 text-sm text-slate-200 focus:outline-none transition-colors"
+            />
           </div>
 
-          {/* Department / Tenant Scope Selector */}
-          <div>
-            <label className="block text-slate-300 font-semibold mb-1 flex items-center justify-between">
-              <span>Tenant Scope Scope</span>
-              <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+          <div className="space-y-1">
+            <label className="text-xs text-slate-400 font-mono flex items-center gap-1.5">
+              <Lock className="w-3.5 h-3.5 text-cyan-400" /> Password
             </label>
-            <select
-              value={tenant}
-              onChange={e => setTenant(e.target.value as RbacTenant)}
-              className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2.5 text-slate-200 focus:outline-none focus:border-cyan-500/50 font-mono"
-            >
-              <option value="HR">HR (Isolated Human Resources Scope)</option>
-              <option value="LEGAL">LEGAL (Legal & Compliance)</option>
-              <option value="FINANCE">FINANCE (Finance & Procurement)</option>
-              <option value="GLOBAL">GLOBAL (Multi-Tenant Scope)</option>
-            </select>
+            <input 
+              type="password" 
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••••••"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-500 text-sm text-slate-200 focus:outline-none transition-colors"
+            />
           </div>
 
-          {/* Submit Action */}
           <button
             type="submit"
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 transition-all hover:scale-[1.02]"
+            disabled={isLoading}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-sm shadow-lg shadow-cyan-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
-            <span>{mode === 'login' ? 'Issue JWT & Authenticate' : 'Register & Issue JWT'}</span>
+            {isLoading ? 'Authenticating with Backend...' : 'Authenticate via Java API Gateway'}
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
+
+        <div className="text-center text-xs text-slate-500">
+          Default seed password: <code className="text-cyan-400 font-mono">password123</code>
+        </div>
       </motion.div>
     </div>
   );

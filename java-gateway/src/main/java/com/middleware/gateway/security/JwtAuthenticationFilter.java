@@ -29,20 +29,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
         try {
+            String uri = request.getRequestURI();
+            boolean isSseStream = uri.endsWith("/telemetry/stream");
+
             String authHeader = request.getHeader("Authorization");
             String token = jwtUtil.extractTokenFromHeader(authHeader);
 
-            // Staff Engineer Pattern: Fallback to ?token=<jwt> parameter for SSE EventSource handshakes
-            if (token == null || token.isBlank()) {
+            // Accept ?token= query parameter strictly on SSE EventSource handshake path
+            if ((token == null || token.isBlank()) && isSseStream) {
                 token = request.getParameter("token");
             }
 
             if (token != null && jwtUtil.validateToken(token)) {
-                String userId = jwtUtil.extractSubject(token);
+                String subject = jwtUtil.extractSubject(token);
                 String role = jwtUtil.extractRole(token);
                 String tenant = jwtUtil.extractTenant(token);
 
-                UserPrincipal userPrincipal = UserPrincipal.create(userId, role, tenant);
+                if (tenant == null || tenant.isBlank()) {
+                    log.warn("Authentication rejected: Missing tenant claim in JWT for subject [{}]", subject);
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"error\": \"Forbidden: Missing required tenant scope in token\"}");
+                    return;
+                }
+
+                UserPrincipal userPrincipal = UserPrincipal.create(subject, role, tenant);
 
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         userPrincipal,
@@ -52,10 +63,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
-                log.debug("Successfully authenticated user [{}] with role [{}] and tenant [{}]", userId, role, tenant);
             }
         } catch (Exception e) {
-            log.error("Could not set user authentication in security context", e);
+            log.error("Could not set user authentication in security context: {}", e.getMessage());
         }
 
         filterChain.doFilter(request, response);

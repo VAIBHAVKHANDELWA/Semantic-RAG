@@ -30,6 +30,7 @@ import {
   INITIAL_AUDIT_LOGS,
   INITIAL_ARCHIVED_CHUNKS
 } from '../data/mockData';
+import { loginApi, IS_DEMO_MODE } from '../api/client';
 
 export interface ToastMessage {
   id: string;
@@ -43,10 +44,11 @@ interface AppContextType {
   currentRoute: AppRoute;
   navigate: (route: AppRoute) => void;
 
-  // Mock JWT Authentication & User Store
+  // JWT Authentication & User Store
   user: User | null;
   isAuthenticated: boolean;
   token: string | null;
+  loginWithCredentials: (email: string, password: string) => Promise<void>;
   loginAsDataSteward: () => void;
   loginAsSystemAdmin: () => void;
   loginAsAuditor: () => void;
@@ -142,8 +144,8 @@ const DEFAULT_USER: User = {
 };
 
 const DEFAULT_WORKSPACE: WorkspaceConfig = {
-  workspaceName: 'Acme Enterprise Vector Guard',
-  targetVectorDb: 'Qdrant (Isolated HR & Legal Collection)',
+  workspaceName: 'Enterprise Semantic RAG Guard',
+  targetVectorDb: 'PostgreSQL + pgvector (384-dim HNSW)',
   ingestionMode: 'Adaptive Chunking + MiniLM Vector Pipeline'
 };
 
@@ -210,7 +212,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Stage 2: Direct-to-Cloud Upload Ticket Request
   const requestUploadTicket = (fileName: string, _fileSize: number, department: TenantScope): UploadTicketResponse => {
     const ticketId = `tkt-${Date.now().toString().slice(-6)}`;
-    const cleanTenant = department === 'ALL' || department === 'GLOBAL' ? 'HR' : department;
+    const cleanTenant = department === 'ALL' ? 'HR' : department;
     const cleanFileName = fileName.replace(/[^a-zA-Z0-9_.-]/g, '_');
     const s3Bucket = `enterprise-vector-rag-${cleanTenant.toLowerCase()}-vault`;
     const s3Key = `uploads/${new Date().getFullYear()}/${cleanFileName}`;
@@ -324,7 +326,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Enforced tenant selection helper for RBAC isolation
   const handleSetSelectedTenant = (tenant: TenantScope) => {
-    if (user?.role === 'DATA_STEWARD' && user.tenant !== 'GLOBAL') {
+    if (user?.role === 'DATA_STEWARD') {
       const allowedTenant = user.tenant as TenantScope;
       if (tenant !== allowedTenant && tenant !== 'ALL') {
         addToast({
@@ -372,7 +374,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addAuditLog({
       actorName: user?.name || 'System Admin',
       actorRole: user?.role || 'SYSTEM_ADMIN',
-      department: 'GLOBAL',
+      department: user?.tenant || 'HR',
       action: 'TENANT_CREATE',
       targetId: newTenant.id,
       details: `Created new department tenant "${name}" (${code}) with ${isolationLevel}.`
@@ -390,7 +392,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addAuditLog({
       actorName: user?.name || 'System Admin',
       actorRole: user?.role || 'SYSTEM_ADMIN',
-      department: 'GLOBAL',
+      department: user?.tenant || 'HR',
       action: 'RATE_LIMIT_CHANGE',
       targetId: String(code),
       details: `Updated ${code} worker rate limit to ${rateLimitReqPerMin} req/min.`
@@ -431,136 +433,91 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Mock JWT Token Builder synchronized with Java Backend secret key
-  const generateMockJwt = (role: RbacRole, tenant: RbacTenant) => {
-    const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-    const payload = btoa(JSON.stringify({
-      sub: `usr-${Date.now().toString().slice(-4)}`,
-      role: role,
-      tenant: tenant,
-      tenantId: tenant,
-      iat: Math.floor(Date.now() / 1000)
-    }));
-    const mockSecret = import.meta.env.VITE_JWT_SECRET || 'aXRzLWEtc2VjcmV0LWtleS10aGF0LW11c3QtYmUtYXQtbGVhc3QtMjU2LWJpdHMtbG9uZw==';
-    const mockSignature = btoa(mockSecret.slice(0, 16) + `_${role}_${tenant}`);
-    return `${header}.${payload}.${mockSignature}`;
+  // Real Backend Login with Java Gateway JWT Authentication
+  const loginWithCredentials = async (email: string, password: string) => {
+    try {
+      const res = await loginApi(email, password);
+      const newUser: User = {
+        id: res.user.id,
+        name: res.user.name,
+        email: res.user.email,
+        role: res.user.role,
+        tenant: res.user.tenant,
+        department: res.user.tenant,
+        token: res.token,
+        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${res.user.email}`
+      };
+      setUser(newUser);
+      setIsAuthenticated(true);
+      setSelectedTenant(res.user.tenant as TenantScope);
+      localStorage.setItem('auth_token', res.token);
+      localStorage.setItem('auth_user', JSON.stringify(newUser));
+
+      if (res.user.role === 'DATA_STEWARD') {
+        setActiveView('quarantine');
+      } else if (res.user.role === 'COMPLIANCE_AUDITOR') {
+        setActiveView('audit_logs');
+      } else {
+        setActiveView('analytics');
+      }
+
+      addToast({
+        type: 'success',
+        title: 'Authentication Succeeded',
+        description: `Logged in as ${res.user.name} (${res.user.role} - ${res.user.tenant}).`
+      });
+      navigate('/dashboard');
+    } catch (err: any) {
+      if (IS_DEMO_MODE) {
+        console.warn("Backend offline, demo mode fallback active");
+        const fallbackTenant: RbacTenant = email.includes('fin') ? 'FINANCE' : (email.includes('leg') ? 'LEGAL' : 'HR');
+        const fallbackRole: RbacRole = email.includes('admin') ? 'SYSTEM_ADMIN' : (email.includes('auditor') ? 'COMPLIANCE_AUDITOR' : 'DATA_STEWARD');
+        const fallbackUser: User = {
+          id: `usr-${Date.now().toString().slice(-4)}`,
+          name: email.split('@')[0],
+          email,
+          role: fallbackRole,
+          tenant: fallbackTenant,
+          token: 'demo-token',
+          avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`
+        };
+        setUser(fallbackUser);
+        setIsAuthenticated(true);
+        setSelectedTenant(fallbackTenant);
+        navigate('/dashboard');
+        return;
+      }
+      addToast({
+        type: 'rose',
+        title: 'Authentication Failed',
+        description: err.message || 'Invalid email or password.'
+      });
+      throw err;
+    }
   };
 
-  // Mock Login Behavior 1: Data Steward (HR)
   const loginAsDataSteward = () => {
-    const newUser: User = {
-      id: 'usr-steward-101',
-      name: 'Sarah Jenkins',
-      tenant: 'HR',
-      role: 'DATA_STEWARD',
-      token: generateMockJwt('DATA_STEWARD', 'HR'),
-      email: 'sarah.jenkins@enterprise.ai',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-    };
-    setUser(newUser);
-    setIsAuthenticated(true);
-    setSelectedTenant('HR');
-    setActiveView('quarantine');
-    addToast({
-      type: 'success',
-      title: 'Logged in as Data Steward (HR)',
-      description: 'JWT Issued. Redirecting to Quarantine Queue.'
-    });
-    navigate('/dashboard');
+    loginWithCredentials('hr_steward@enterprise.com', 'password123');
   };
 
-  // Mock Login Behavior 2: System Admin (GLOBAL)
   const loginAsSystemAdmin = () => {
-    const newUser: User = {
-      id: 'usr-admin-102',
-      name: 'Alex Rivera',
-      tenant: 'GLOBAL',
-      role: 'SYSTEM_ADMIN',
-      token: generateMockJwt('SYSTEM_ADMIN', 'GLOBAL'),
-      email: 'alex.rivera@enterprise.ai',
-      avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'
-    };
-    setUser(newUser);
-    setIsAuthenticated(true);
-    setSelectedTenant('ALL');
-    setActiveView('analytics');
-    addToast({
-      type: 'success',
-      title: 'Logged in as System Admin (GLOBAL)',
-      description: 'JWT Issued. Redirecting to Global Health & Infrastructure metrics.'
-    });
-    navigate('/dashboard');
+    loginWithCredentials('hr_admin@enterprise.com', 'password123');
   };
 
-  // Mock Login Behavior 3: Compliance Auditor (GLOBAL)
   const loginAsAuditor = () => {
-    const newUser: User = {
-      id: 'usr-auditor-103',
-      name: 'Marcus Vance',
-      tenant: 'GLOBAL',
-      role: 'COMPLIANCE_AUDITOR',
-      token: generateMockJwt('COMPLIANCE_AUDITOR', 'GLOBAL'),
-      email: 'marcus.vance@legal.ai',
-      avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80'
-    };
-    setUser(newUser);
-    setIsAuthenticated(true);
-    setSelectedTenant('ALL');
-    setActiveView('lineage');
-    addToast({
-      type: 'success',
-      title: 'Logged in as Compliance Auditor (GLOBAL)',
-      description: 'JWT Issued. Redirecting to Vector Lineage Traceability.'
-    });
-    navigate('/dashboard');
+    loginWithCredentials('legal_auditor@enterprise.com', 'password123');
   };
 
-  const loginWithProfile = (email: string, role: RbacRole, tenant: RbacTenant) => {
-    const userName = email.split('@')[0].replace('.', ' ').replace(/^./, str => str.toUpperCase());
-    const newUser: User = {
-      id: `usr-${Date.now().toString().slice(-4)}`,
-      name: userName || 'Enterprise User',
-      email,
-      role,
-      tenant,
-      token: generateMockJwt(role, tenant),
-      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`
-    };
-    setUser(newUser);
-    setIsAuthenticated(true);
-    if (tenant !== 'GLOBAL') setSelectedTenant(tenant as TenantScope);
-
-    addToast({
-      type: 'success',
-      title: 'JWT Authentication Issued',
-      description: `Authenticated as ${newUser.name} (${role} - ${tenant}).`
-    });
-    navigate('/dashboard');
+  const loginWithProfile = (email: string, _role: RbacRole, _tenant: RbacTenant) => {
+    loginWithCredentials(email, 'password123');
   };
 
   // Debug Role Switcher for live UI testing
   const setRoleDebug = (role: RbacRole) => {
     if (!user) return;
-    const tenant: RbacTenant = role === 'DATA_STEWARD' ? 'HR' : 'GLOBAL';
-    const updatedUser: User = {
-      ...user,
-      role,
-      tenant,
-      token: generateMockJwt(role, tenant)
-    };
-    setUser(updatedUser);
-    if (tenant !== 'GLOBAL') setSelectedTenant(tenant as TenantScope);
-    
-    // Auto-swap default view
-    if (role === 'DATA_STEWARD') setActiveView('quarantine');
-    else if (role === 'SYSTEM_ADMIN') setActiveView('analytics');
-    else if (role === 'COMPLIANCE_AUDITOR') setActiveView('lineage');
-
-    addToast({
-      type: 'info',
-      title: `Persona Switched to ${role}`,
-      description: `Swapped dashboard layout and tenant scope to ${tenant}.`
-    });
+    const targetEmail = role === 'DATA_STEWARD' ? 'hr_steward@enterprise.com' 
+      : (role === 'COMPLIANCE_AUDITOR' ? 'legal_auditor@enterprise.com' : 'hr_admin@enterprise.com');
+    loginWithCredentials(targetEmail, 'password123');
   };
 
   const logout = () => {

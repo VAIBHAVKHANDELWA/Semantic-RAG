@@ -15,10 +15,34 @@ import java.util.Date;
 public class JwtUtil {
 
     private final SecretKey key;
+    private final long expirationMs;
 
-    public JwtUtil(@Value("${jwt.secret}") String secret) {
+    public JwtUtil(
+            @Value("${jwt.secret}") String secret,
+            @Value("${jwt.expiration-ms:86400000}") long expirationMs
+    ) {
         byte[] keyBytes = Decoders.BASE64.decode(secret);
         this.key = Keys.hmacShaKeyFor(keyBytes);
+        this.expirationMs = expirationMs;
+    }
+
+    /**
+     * Issues a cryptographically signed JWT for authenticated user principals.
+     */
+    public String generateToken(String email, String userId, String role, String tenantId, String displayName) {
+        Date now = new Date();
+        Date expiry = new Date(now.getTime() + expirationMs);
+
+        return Jwts.builder()
+                .subject(email)
+                .claim("userId", userId)
+                .claim("role", role)
+                .claim("tenantId", tenantId)
+                .claim("displayName", displayName)
+                .issuedAt(now)
+                .expiration(expiry)
+                .signWith(key)
+                .compact();
     }
 
     /**
@@ -55,12 +79,12 @@ public class JwtUtil {
      */
     public String extractRole(String token) {
         Claims claims = getClaims(token);
-        String role = claims.get("role", String.class);
-        return role != null ? role : "DATA_STEWARD";
+        return claims.get("role", String.class);
     }
 
     /**
      * Extracts tenant ID from custom claim "tenantId" or "tenant".
+     * Returns null if missing (no fallback to GLOBAL).
      */
     public String extractTenant(String token) {
         Claims claims = getClaims(token);
@@ -68,7 +92,7 @@ public class JwtUtil {
         if (tenantId == null) {
             tenantId = claims.get("tenant", String.class);
         }
-        return tenantId != null ? tenantId : "GLOBAL";
+        return tenantId;
     }
 
     /**

@@ -204,3 +204,4 @@ All seeded users have the default password: **`password123`**
   ```sql
   SELECT extname, extversion FROM pg_extension WHERE extname = 'vector';
   ```
+

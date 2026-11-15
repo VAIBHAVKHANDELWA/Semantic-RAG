@@ -155,3 +155,4 @@ CREATE TABLE IF NOT EXISTS telemetry_metrics (
 );
 
 CREATE INDEX IF NOT EXISTS idx_telemetry_tenant_metric ON telemetry_metrics(tenant_id, metric, recorded_at DESC);
+

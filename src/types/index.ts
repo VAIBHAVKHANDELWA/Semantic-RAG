@@ -1,5 +1,5 @@
-export type RbacTenant = 'HR' | 'FINANCE' | 'LEGAL' | 'ENGINEERING' | 'GLOBAL';
-export type TenantScope = 'ALL' | 'HR' | 'LEGAL' | 'FINANCE' | 'ENGINEERING' | 'GLOBAL';
+export type RbacTenant = 'HR' | 'FINANCE' | 'LEGAL' | 'ENGINEERING';
+export type TenantScope = 'ALL' | 'HR' | 'LEGAL' | 'FINANCE' | 'ENGINEERING';
 
 export type RbacRole = 'DATA_STEWARD' | 'SYSTEM_ADMIN' | 'COMPLIANCE_AUDITOR';
 export type UserRole = RbacRole | 'IT_ADMIN' | 'AI_ARCHITECT' | 'LEGAL_COUNSEL';

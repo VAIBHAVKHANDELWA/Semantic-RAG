@@ -89,3 +89,4 @@ volumes:
   postgres_data:
   rabbitmq_data:
   minio_data:
+
