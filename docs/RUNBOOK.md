@@ -102,8 +102,11 @@ docker compose ps
 ```
 
 #### Step 3: Run Database Schema Migrations and Seed Data
-The database schema is managed exclusively by Flyway migrations (`V1__init_schema.sql`).
-Run the idempotent seed script to populate tenants, users, policy pairs, and quarantined clusters:
+The database schema is managed exclusively by Flyway migrations (`V1__init_schema.sql` through `V5__fix_seed_password_hashes.sql`).
+When starting the Java API Gateway (`mvn spring-boot:run`), Flyway executes all pending migrations automatically.
+Migration V5 updates the BCrypt hashes for seeded users (`password123`) using pgcrypto `crypt(..., gen_salt('bf', 10))`.
+
+To run the idempotent seed script to populate additional demo policy pairs:
 ```bash
 python seed.py
 ```
