@@ -545,19 +545,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     navigate('/dashboard');
   };
 
-  // Real-time telemetry pulse effect
+  // Real telemetry and event updates driven via SSE EventSource
   useEffect(() => {
-    const interval = setInterval(() => {
-      setTelemetry(prev => ({
-        ...prev,
-        gatewayLatencyMs: Math.max(10, Math.min(24, Math.round(prev.gatewayLatencyMs + (Math.random() * 4 - 2)))),
-        rabbitMqLatencyMs: Number((prev.rabbitMqLatencyMs + (Math.random() * 0.4 - 0.2)).toFixed(1)),
-        pythonGpuLoad: Number(Math.max(40, Math.min(95, prev.pythonGpuLoad + (Math.random() * 3 - 1.5))).toFixed(1)),
-        tokensPerSec: Math.round(prev.tokensPerSec + (Math.random() * 200 - 100))
-      }));
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
+    const userToken = user?.token;
+    if (!userToken || !user?.tenant) return;
+
+    const sseUrl = `${import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:8080/api/v1'}/telemetry/stream?token=${encodeURIComponent(userToken)}`;
+    let eventSource: EventSource | null = null;
+
+    try {
+      eventSource = new EventSource(sseUrl);
+
+      eventSource.addEventListener('INIT', (e) => {
+        console.info('[SSE] Handshake acknowledged:', e.data);
+      });
+
+      eventSource.addEventListener('TELEMETRY', (e) => {
+        try {
+          const payload = JSON.parse(e.data);
+          if (payload) {
+            setTelemetry(prev => ({
+              ...prev,
+              gatewayLatencyMs: payload.gatewayLatencyMs || prev.gatewayLatencyMs,
+              tokensPerSec: payload.tokensPerSec || prev.tokensPerSec,
+            }));
+          }
+        } catch (err) {
+          console.debug('[SSE] Telemetry parse err:', err);
+        }
+      });
+
+      eventSource.addEventListener('CONFLICT_RESOLVED', (e) => {
+        try {
+          const payload = JSON.parse(e.data);
+          addToast({
+            type: 'info',
+            title: 'Conflict Resolved Real-Time',
+            description: `Conflict ${payload.conflictId} resolved via ${payload.action}.`
+          });
+        } catch (err) {}
+      });
+
+      eventSource.onerror = () => {
+        eventSource?.close();
+      };
+    } catch (e) {
+      console.warn('SSE subscription error:', e);
+    }
+
+    return () => {
+      eventSource?.close();
+    };
+  }, [user?.token, user?.tenant]);
 
   // Simulating ingestion pipeline progress
   useEffect(() => {

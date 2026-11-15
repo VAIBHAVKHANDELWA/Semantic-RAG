@@ -39,7 +39,7 @@ export const SystemLogsView: React.FC = () => {
       const timeStr = now.toTimeString().slice(0, 8) + '.' + String(now.getMilliseconds()).padStart(3, '0');
       
       const sampleMessages = [
-        { service: 'RABBITMQ', level: 'INFO', message: `Dispatched ${Math.floor(Math.random()*50)+10} chunks to Qdrant indexer queue.` },
+        { service: 'RABBITMQ', level: 'INFO', message: `Dispatched ${Math.floor(Math.random()*50)+10} chunks to pgvector indexer queue.` },
         { service: 'REDIS_CACHE', level: 'DEBUG', message: `Semantic cache HIT (similarity=0.982) for query vector ID vec-${Math.floor(Math.random()*8000)+1000}.` },
         { service: 'PYTHON_WORKER', level: 'INFO', message: `GPU load at ${telemetry.pythonGpuLoad}%. Active PyTorch worker instances: 8.` },
         { service: 'JAVA_GATEWAY', level: 'INFO', message: `Auth token refreshed for tenant LEGAL (isolation=Encrypted Tenant Context).` },
