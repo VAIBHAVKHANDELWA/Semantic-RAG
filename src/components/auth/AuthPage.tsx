@@ -1,11 +1,8 @@
 import React, { useState } from 'react';
 import { 
   Network, 
-  ShieldCheck, 
-  User as UserIcon, 
   Mail, 
   Lock, 
-  Building2, 
   ArrowRight, 
   Key,
   UserCheck,
@@ -13,20 +10,17 @@ import {
   FileCheck
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import type { RbacTenant, RbacRole } from '../../types';
 import { motion } from 'framer-motion';
 
 interface AuthPageProps {
   initialMode?: 'login' | 'signup';
 }
 
-export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
+export const AuthPage: React.FC<AuthPageProps> = ({ initialMode: _initialMode = 'login' }) => {
   const { 
     loginWithCredentials,
     navigate 
   } = useApp();
-
-  const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
   const [email, setEmail] = useState('hr_steward@enterprise.com');
   const [password, setPassword] = useState('password123');
   const [isLoading, setIsLoading] = useState(false);

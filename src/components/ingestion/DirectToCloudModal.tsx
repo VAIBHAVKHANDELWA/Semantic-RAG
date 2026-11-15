@@ -24,7 +24,7 @@ export const DirectToCloudModal: React.FC<DirectToCloudModalProps> = ({ isOpen, 
   const [activeTicket, setActiveTicket] = useState<UploadTicketResponse | null>(null);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
-  const cleanTenant = selectedTenant === 'ALL' || selectedTenant === 'GLOBAL' ? 'HR' : selectedTenant;
+  const cleanTenant = selectedTenant === 'ALL' ? 'HR' : selectedTenant;
 
   const handleGenerateTicket = () => {
     const ticket = requestUploadTicket(testFileName, testFileSizeMb * 1024 * 1024, cleanTenant);

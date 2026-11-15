@@ -20,7 +20,7 @@ export const AiPipelineVisualizer: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [llmModalOpen, setLlmModalOpen] = useState(false);
 
-  const cleanTenant = selectedTenant === 'ALL' || selectedTenant === 'GLOBAL' ? 'HR' : selectedTenant;
+  const cleanTenant = selectedTenant === 'ALL' ? 'HR' : selectedTenant;
 
   const [steps] = useState<PipelineStepStatus[]>([
     {

@@ -15,7 +15,7 @@ export const PgVectorSearchInspector: React.FC<PgVectorSearchInspectorProps> = (
   tenant, 
   queryResults 
 }) => {
-  const cleanTenant = tenant === 'ALL' || tenant === 'GLOBAL' ? 'HR' : tenant;
+  const cleanTenant = tenant === 'ALL' ? 'HR' : tenant;
 
   const results: PgVectorQueryResult[] = queryResults || [
     {

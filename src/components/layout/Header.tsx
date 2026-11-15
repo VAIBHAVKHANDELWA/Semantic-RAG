@@ -154,7 +154,7 @@ export const Header: React.FC = () => {
         <div className="relative">
           <button
             onClick={() => {
-              if (user?.role === 'DATA_STEWARD' && user.tenant !== 'GLOBAL') {
+              if (user?.role === 'DATA_STEWARD') {
                 return; // Locked for Data Steward
               }
               setTenantDropdownOpen(!tenantDropdownOpen);
@@ -168,7 +168,7 @@ export const Header: React.FC = () => {
           >
             <Building2 className="w-3.5 h-3.5 text-cyan-400" />
             <span>
-              {selectedTenant === 'ALL' || selectedTenant === 'GLOBAL' ? 'Global Scope' : currentTenantObj?.name}
+              {selectedTenant === 'ALL' ? 'Global Scope' : currentTenantObj?.name}
             </span>
             <span className={`px-1.5 py-0.5 rounded text-[10px] border font-mono ${
               user?.role === 'DATA_STEWARD'
@@ -197,7 +197,7 @@ export const Header: React.FC = () => {
 
                 <button
                   onClick={() => handleSelectTenant('ALL')}
-                  className={`w-full text-left px-3 py-2.5 text-xs flex items-center justify-between hover:bg-slate-800/60 transition-colors ${selectedTenant === 'ALL' || selectedTenant === 'GLOBAL' ? 'bg-cyan-500/10 text-cyan-300 font-semibold' : 'text-slate-300'}`}
+                  className={`w-full text-left px-3 py-2.5 text-xs flex items-center justify-between hover:bg-slate-800/60 transition-colors ${selectedTenant === 'ALL' ? 'bg-cyan-500/10 text-cyan-300 font-semibold' : 'text-slate-300'}`}
                 >
                   <div className="flex items-center gap-2">
                     <Layers className="w-4 h-4 text-slate-400" />

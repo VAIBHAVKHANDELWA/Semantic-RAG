@@ -725,6 +725,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       user,
       isAuthenticated,
       token: user?.token || null,
+      loginWithCredentials,
       loginAsDataSteward,
       loginAsSystemAdmin,
       loginAsAuditor,

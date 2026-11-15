@@ -217,7 +217,7 @@ export const Sidebar: React.FC = () => {
                 <span className="text-[10px] font-mono text-emerald-400">ACTIVE</span>
               </div>
               <div className="mt-1 text-[10px] text-slate-400 font-mono truncate">
-                {selectedTenant === 'ALL' || selectedTenant === 'GLOBAL' ? 'Global Multi-Tenant' : currentTenantObj?.isolationLevel}
+                {selectedTenant === 'ALL' ? 'Global Multi-Tenant' : currentTenantObj?.isolationLevel}
               </div>
             </div>
 

@@ -60,7 +60,7 @@ export const PersonaDashboard: React.FC = () => {
 
   // Filter conflicts for Data Steward
   const tenantConflicts = conflicts.filter(c => {
-    if (selectedTenant !== 'ALL' && selectedTenant !== 'GLOBAL') {
+    if (selectedTenant !== 'ALL') {
       return c.department === selectedTenant;
     }
     return c.department === tenant || selectedTenant === 'ALL';
