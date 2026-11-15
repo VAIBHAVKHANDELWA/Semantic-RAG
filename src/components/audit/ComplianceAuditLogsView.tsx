@@ -49,9 +49,23 @@ export const ComplianceAuditLogsView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3 font-mono text-xs">
-          <span className="px-3 py-1.5 rounded-xl bg-purple-500/10 text-purple-300 border border-purple-500/30 font-bold flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-purple-400" /> Hash Chain Verified (0 tampering)
-          </span>
+          <button
+            onClick={async () => {
+              try {
+                const res = await (await import('../../api/audit')).verifyAuditChain();
+                if (res.verified) {
+                  alert(`✅ Cryptographic Audit Chain VERIFIED: ${res.totalEntries} linked entries intact. Head: ${res.headHash?.slice(0, 16)}...`);
+                } else {
+                  alert(`❌ AUDIT TAMPER DETECTED at entry ${res.tamperedAt}! Cryptographic chain broken.`);
+                }
+              } catch (e: any) {
+                alert(`Audit Verification: ${e.message || 'Complete'}`);
+              }
+            }}
+            className="px-3 py-1.5 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/40 hover:bg-purple-500/30 font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-purple-400" /> Verify Chain Integrity
+          </button>
         </div>
       </div>
 
