@@ -7,7 +7,7 @@ from config import settings
 
 logger = logging.getLogger("python-ai-engine.storage")
 
-TIKA_URL = os.environ.get("TIKA_ENDPOINT", "http://tika:9998")
+TIKA_URL = os.environ.get("TIKA_ENDPOINT", "http://localhost:9998")
 
 
 class StorageService:

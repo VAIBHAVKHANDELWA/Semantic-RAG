@@ -152,6 +152,14 @@ class DatabaseService:
                         f"top similarity = {highest_similarity:.4f}"
                     )
 
+                    # Ensure parent document row exists in documents table
+                    doc_id = f"doc-{job_id}"
+                    cur.execute("""
+                        INSERT INTO documents (id, tenant_id, job_id, name, status)
+                        VALUES (%s, %s, %s, %s, 'ACTIVE')
+                        ON CONFLICT (id) DO NOTHING;
+                    """, (doc_id, sanitized_tenant, job_id, doc_name))
+
                     # Collision Check Threshold (> 85% by default)
                     if highest_similarity >= settings.SIMILARITY_THRESHOLD and existing_text:
                         conflict_id = f"conf-{uuid.uuid4().hex[:8]}"
@@ -178,19 +186,28 @@ class DatabaseService:
                                 contradiction_explanation, status
                             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'PENDING');
                         """, (
-                            conflict_id, job_id, sanitized_tenant, doc_name, existing_doc,
+                            conflict_id, job_id, sanitized_tenant, doc_id, existing_doc,
                             chunk_text, existing_id, existing_text,
                             highest_similarity, verdict_type, confidence,
                             explanation
                         ))
 
-                        # Insert initial provenance edge (CONTRADICTS)
+                        # Map verdict_type to valid provenance_edges relation ('SUPERSEDES', 'CONTRADICTS', 'PARTIAL_UPDATE_OF', 'DERIVED_FROM')
+                        relation_map = {
+                            "CONTRADICTORY": "CONTRADICTS",
+                            "SUPERSEDING_POLICY": "SUPERSEDES",
+                            "PARTIAL_UPDATE": "PARTIAL_UPDATE_OF",
+                            "CLEAN_APPEND": "DERIVED_FROM"
+                        }
+                        edge_relation = relation_map.get(verdict_type, "CONTRADICTS")
+
+                        # Insert initial provenance edge
                         pe_id = f"pe-{uuid.uuid4().hex[:8]}"
                         cur.execute("""
                             INSERT INTO provenance_edges (
                                 id, tenant_id, from_chunk_id, to_chunk_id, relation, created_by_conflict_id
                             ) VALUES (%s, %s, %s, %s, %s, %s);
-                        """, (pe_id, sanitized_tenant, existing_id, conflict_id, verdict_type, conflict_id))
+                        """, (pe_id, sanitized_tenant, existing_id, conflict_id, edge_relation, conflict_id))
 
                         conn.commit()
 
@@ -206,10 +223,10 @@ class DatabaseService:
                         # CLEAN CHUNK: Commit to vector_chunks table
                         cur.execute("""
                             INSERT INTO vector_chunks (
-                                id, doc_name, tenant_id, chunk_index, chunk_text, embedding,
+                                id, document_id, doc_name, tenant_id, chunk_index, chunk_text, embedding,
                                 status, content_sha256
-                            ) VALUES (%s, %s, %s, %s, %s, %s, 'ACTIVE', %s);
-                        """, (chunk_id, doc_name, sanitized_tenant, chunk_index, chunk_text, embedding, chunk_sha256))
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, 'ACTIVE', %s);
+                        """, (chunk_id, doc_id, doc_name, sanitized_tenant, chunk_index, chunk_text, embedding, chunk_sha256))
 
                         conn.commit()
                         logger.info(f"Clean chunk [{chunk_id}] committed to Vector DB for Tenant [{sanitized_tenant}].")

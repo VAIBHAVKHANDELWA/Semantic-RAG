@@ -22,16 +22,18 @@ class RabbitMQWorker:
         self.connection = None
         self.channel = None
 
-    def publish_telemetry(self, event_type: str, tenant_id: str, payload: dict):
-        """Emits telemetry events into telemetry-queue consumed by Java SSE streamer."""
+    def publish_telemetry(self, status: str, tenant_id: str, job_id: str, progress_percentage: int, message: str):
+        """Emits telemetry events into telemetry-queue matching Java TelemetryEvent shape."""
         if not self.channel or not self.channel.is_open:
             return
         try:
             msg = json.dumps({
-                "eventType": event_type,
-                "tenantId": tenant_id,
-                "timestamp": int(time.time() * 1000),
-                "data": payload
+                "jobId": job_id,
+                "tenantId": tenant_id if tenant_id else "GLOBAL",
+                "status": status,
+                "progressPercentage": progress_percentage,
+                "message": message,
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S")
             })
             self.channel.basic_publish(
                 exchange="",
@@ -40,7 +42,7 @@ class RabbitMQWorker:
                 properties=pika.BasicProperties(delivery_mode=2)
             )
         except Exception as e:
-            logger.warning(f"Failed to publish telemetry event [{event_type}]: {e}")
+            logger.warning(f"Failed to publish telemetry event [{status}]: {e}")
 
     def start_listening(self):
         """
@@ -113,7 +115,10 @@ class RabbitMQWorker:
         job_id = None
         tenant_id = None
         try:
-            payload = json.loads(body.decode("utf-8"))
+            raw_decoded = body.decode("utf-8")
+            payload = json.loads(raw_decoded)
+            if isinstance(payload, str):
+                payload = json.loads(payload)
             job_id = payload.get("jobId", f"job-{int(time.time())}")
             tenant_id = payload.get("tenantId")
             object_key = payload.get("objectKey")
@@ -131,9 +136,7 @@ class RabbitMQWorker:
             logger.info(f"Received Ingestion Job [{job_id}] for Tenant [{tenant_id}] - Key: [{object_key}]")
 
             # Telemetry: Ingestion started
-            self.publish_telemetry("PROCESSING", tenant_id, {
-                "jobId": job_id, "objectKey": object_key, "status": "EXTRACTING"
-            })
+            self.publish_telemetry("PROCESSING", tenant_id, job_id, 10, f"Extracting text from {object_key}")
 
             # Step 1: Download & Extract Document Content via Apache Tika
             raw_text = storage_service.download_and_extract_text(object_key)
@@ -141,6 +144,7 @@ class RabbitMQWorker:
             if not raw_text or not raw_text.strip():
                 logger.warning(f"File [{object_key}] contained no extractable text. Marking job completed empty.")
                 db_service.update_job_counters(job_id, chunk_total=0, chunks_committed=0, chunks_quarantined=0, status="COMPLETED")
+                self.publish_telemetry("COMPLETED", tenant_id, job_id, 100, f"Empty document {object_key} processed")
                 ch.basic_ack(delivery_tag=delivery_tag)
                 return
 
@@ -148,9 +152,7 @@ class RabbitMQWorker:
             chunks = ai_service.chunk_text(raw_text)
             chunk_total = len(chunks)
 
-            self.publish_telemetry("PROCESSING", tenant_id, {
-                "jobId": job_id, "chunkTotal": chunk_total, "status": "EMBEDDING"
-            })
+            self.publish_telemetry("PROCESSING", tenant_id, job_id, 30, f"Generated {chunk_total} chunks, computing embeddings...")
 
             # Step 3: Vector Embeddings
             embeddings = ai_service.generate_embeddings(chunks)
@@ -171,13 +173,9 @@ class RabbitMQWorker:
                 )
                 if result.get("status") == "QUARANTINED":
                     quarantine_count += 1
-                    self.publish_telemetry("CONFLICT_DETECTED", tenant_id, {
-                        "jobId": job_id,
-                        "conflictId": result.get("conflict_id"),
-                        "similarity": result.get("similarity"),
-                        "verdict": result.get("verdict"),
-                        "docName": doc_name
-                    })
+                    self.publish_telemetry("CONFLICT_DETECTED", tenant_id, job_id, 50 + int((idx+1)/chunk_total * 40),
+                        f"Conflict detected for chunk {idx+1}/{chunk_total} with {result.get('verdict')} (similarity: {result.get('similarity'):.2f})"
+                    )
                 elif result.get("status") in ("COMMITTED", "ALREADY_COMMITTED"):
                     committed_count += 1
 
@@ -190,12 +188,9 @@ class RabbitMQWorker:
                 status="COMPLETED"
             )
 
-            self.publish_telemetry("COMPLETED", tenant_id, {
-                "jobId": job_id,
-                "chunksTotal": chunk_total,
-                "chunksCommitted": committed_count,
-                "chunksQuarantined": quarantine_count
-            })
+            self.publish_telemetry("COMPLETED", tenant_id, job_id, 100,
+                f"Job completed: {chunk_total} chunks processed ({committed_count} committed, {quarantine_count} quarantined)"
+            )
 
             logger.info(
                 f"Successfully completed Job [{job_id}]: {chunk_total} chunks "

@@ -112,21 +112,27 @@ python seed.py
 ```
 
 #### Step 4: Start the Java API Gateway
-```bash
-cd java-gateway
+In Windows PowerShell (ensuring JDK 21 is used, never JDK 22):
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-21.0.13.9-hotspot"
+$env:Path = "$env:JAVA_HOME\bin;" + $env:Path
+cd d:\major\java-gateway
 mvn spring-boot:run
 ```
-*Health Check:* `curl http://localhost:8080/api/v1/health`
+*Health Check:* `curl.exe http://localhost:8080/api/v1/health`
 
 #### Step 5: Start the Python AI Engine & Queue Worker
-```bash
-cd python-ai-engine
-python main.py
+In a new Windows PowerShell terminal:
+```powershell
+cd d:\major\python-ai-engine
+python -m uvicorn main:app --port 8000
 ```
-*Health Check:* `curl http://localhost:8000/health`
+*Health Check:* `curl.exe http://localhost:8000/health`
 
 #### Step 6: Start the React Frontend Application
-```bash
+In a third Windows PowerShell terminal:
+```powershell
+cd d:\major
 npm install
 npm run dev
 ```
