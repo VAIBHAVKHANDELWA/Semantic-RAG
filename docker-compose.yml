@@ -62,6 +62,7 @@ services:
       /usr/bin/mc alias set localminio http://minio:9000 minioadmin minioadmin;
       /usr/bin/mc mb localminio/semantic-rag-uploads --ignore-existing;
       /usr/bin/mc anonymous set download localminio/semantic-rag-uploads;
+      /usr/bin/mc cors set localminio/semantic-rag-uploads --allowed-origin 'http://localhost:5173' --allowed-method 'PUT' --allowed-header '*';
       exit 0;
       "
 
