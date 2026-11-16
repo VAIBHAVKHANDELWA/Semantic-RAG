@@ -30,6 +30,7 @@ import {
   INITIAL_AUDIT_LOGS,
   INITIAL_ARCHIVED_CHUNKS
 } from '../data/mockData';
+import { loginApi, logoutApi } from '../api/client';
 
 export interface ToastMessage {
   id: string;
@@ -43,10 +44,12 @@ interface AppContextType {
   currentRoute: AppRoute;
   navigate: (route: AppRoute) => void;
 
-  // Mock JWT Authentication & User Store
+  // JWT Authentication & User Store
   user: User | null;
   isAuthenticated: boolean;
   token: string | null;
+  loginWithCredentials: (email: string, password: string) => Promise<void>;
+  updateUserPassword: (newToken: string) => void;
   loginAsDataSteward: () => void;
   loginAsSystemAdmin: () => void;
   loginAsAuditor: () => void;
@@ -129,31 +132,46 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// Initial Default User Profile (Data Steward HR)
-const DEFAULT_USER: User = {
-  id: 'usr-steward-101',
-  name: 'Sarah Jenkins',
-  tenant: 'HR',
-  department: 'HR',
-  role: 'DATA_STEWARD',
-  token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3ItMTAxIiwicm9sZSI6IkRBVEFfU1RFV0FSRCIsInRlbmFudCI6IkhSIiwiaWF0IjoxNTE2MjM5MDIyfQ.signature',
-  email: 'sarah.jenkins@enterprise.ai',
-  avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-};
+// ARCHITECTURAL EXPLANATION: sessionStorage vs localStorage for Enterprise JWT:
+// 1. Tab-Level Isolation: sessionStorage is strictly scoped to the active browser tab.
+//    Opening another tab or tenant context will not accidentally leak or overwrite this token.
+// 2. Ephemeral Lifetime: The token is automatically deleted when the user closes the tab,
+//    preventing persistent session hijack or token extraction from stagnant browser storage.
+// 3. Tab Refresh Continuity: Survives user page reloads (F5) within the same active tab,
+//    preventing disruptive mid-workflow logouts.
+// 4. In-Memory React State: Paired with useState for zero-latency UI reactivity across components.
+function getInitialAuth(): { token: string | null; user: User | null } {
+  if (typeof window === 'undefined') return { token: null, user: null };
+  try {
+    const storedToken = sessionStorage.getItem('auth_token');
+    const storedUserJson = sessionStorage.getItem('auth_user');
+    if (storedToken && storedUserJson) {
+      const parsedUser = JSON.parse(storedUserJson);
+      return { token: storedToken, user: parsedUser };
+    }
+  } catch (err) {
+    console.error('Failed to parse cached auth session', err);
+    sessionStorage.removeItem('auth_token');
+    sessionStorage.removeItem('auth_user');
+  }
+  return { token: null, user: null };
+}
 
 const DEFAULT_WORKSPACE: WorkspaceConfig = {
-  workspaceName: 'Acme Enterprise Vector Guard',
-  targetVectorDb: 'Qdrant (Isolated HR & Legal Collection)',
+  workspaceName: 'Enterprise Semantic RAG Guard',
+  targetVectorDb: 'PostgreSQL + pgvector (384-dim HNSW)',
   ingestionMode: 'Adaptive Chunking + MiniLM Vector Pipeline'
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentRoute, setCurrentRoute] = useState<AppRoute>('/dashboard');
-  const [user, setUser] = useState<User | null>(DEFAULT_USER);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
+  const initialAuth = getInitialAuth();
+  const [currentRoute, setCurrentRoute] = useState<AppRoute>(initialAuth.user ? '/dashboard' : '/login');
+  const [user, setUser] = useState<User | null>(initialAuth.user);
+  const [token, setToken] = useState<string | null>(initialAuth.token);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!initialAuth.user);
   const [workspaceConfig, setWorkspaceConfig] = useState<WorkspaceConfig>(DEFAULT_WORKSPACE);
 
-  const [selectedTenant, setSelectedTenant] = useState<TenantScope>('HR');
+  const [selectedTenant, setSelectedTenant] = useState<TenantScope>((initialAuth.user?.tenant as TenantScope) || 'HR');
   const [activeView, setActiveView] = useState<ActiveViewType>('quarantine');
   const [tenants, setTenants] = useState<Tenant[]>(INITIAL_TENANTS);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(INITIAL_AUDIT_LOGS);
@@ -210,7 +228,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Stage 2: Direct-to-Cloud Upload Ticket Request
   const requestUploadTicket = (fileName: string, _fileSize: number, department: TenantScope): UploadTicketResponse => {
     const ticketId = `tkt-${Date.now().toString().slice(-6)}`;
-    const cleanTenant = department === 'ALL' || department === 'GLOBAL' ? 'HR' : department;
+    const cleanTenant = department === 'ALL' ? 'HR' : department;
     const cleanFileName = fileName.replace(/[^a-zA-Z0-9_.-]/g, '_');
     const s3Bucket = `enterprise-vector-rag-${cleanTenant.toLowerCase()}-vault`;
     const s3Key = `uploads/${new Date().getFullYear()}/${cleanFileName}`;
@@ -324,7 +342,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Enforced tenant selection helper for RBAC isolation
   const handleSetSelectedTenant = (tenant: TenantScope) => {
-    if (user?.role === 'DATA_STEWARD' && user.tenant !== 'GLOBAL') {
+    if (user?.role === 'DATA_STEWARD') {
       const allowedTenant = user.tenant as TenantScope;
       if (tenant !== allowedTenant && tenant !== 'ALL') {
         addToast({
@@ -372,7 +390,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addAuditLog({
       actorName: user?.name || 'System Admin',
       actorRole: user?.role || 'SYSTEM_ADMIN',
-      department: 'GLOBAL',
+      department: user?.tenant || 'HR',
       action: 'TENANT_CREATE',
       targetId: newTenant.id,
       details: `Created new department tenant "${name}" (${code}) with ${isolationLevel}.`
@@ -390,7 +408,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addAuditLog({
       actorName: user?.name || 'System Admin',
       actorRole: user?.role || 'SYSTEM_ADMIN',
-      department: 'GLOBAL',
+      department: user?.tenant || 'HR',
       action: 'RATE_LIMIT_CHANGE',
       targetId: String(code),
       details: `Updated ${code} worker rate limit to ${rateLimitReqPerMin} req/min.`
@@ -431,147 +449,111 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Mock JWT Token Builder synchronized with Java Backend secret key
-  const generateMockJwt = (role: RbacRole, tenant: RbacTenant) => {
-    const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-    const payload = btoa(JSON.stringify({
-      sub: `usr-${Date.now().toString().slice(-4)}`,
-      role: role,
-      tenant: tenant,
-      tenantId: tenant,
-      iat: Math.floor(Date.now() / 1000)
-    }));
-    const mockSecret = import.meta.env.VITE_JWT_SECRET || 'aXRzLWEtc2VjcmV0LWtleS10aGF0LW11c3QtYmUtYXQtbGVhc3QtMjU2LWJpdHMtbG9uZw==';
-    const mockSignature = btoa(mockSecret.slice(0, 16) + `_${role}_${tenant}`);
-    return `${header}.${payload}.${mockSignature}`;
+  // Real Backend Login with Java Gateway JWT Authentication
+  const loginWithCredentials = async (email: string, password: string) => {
+    try {
+      const res = await loginApi(email, password);
+      const newUser: User = {
+        id: res.user.id,
+        name: res.user.name,
+        email: res.user.email,
+        role: res.user.role,
+        tenant: res.user.tenant,
+        department: res.user.tenant,
+        token: res.token,
+        mustChangePassword: res.mustChangePassword,
+        isSuperAdmin: res.user.isSuperAdmin,
+        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${res.user.email}`
+      };
+      setUser(newUser);
+      setToken(res.token);
+      setIsAuthenticated(true);
+      setSelectedTenant(res.user.tenant as TenantScope);
+      sessionStorage.setItem('auth_token', res.token);
+      sessionStorage.setItem('auth_user', JSON.stringify(newUser));
+
+      if (res.user.role === 'DATA_STEWARD') {
+        setActiveView('quarantine');
+      } else if (res.user.role === 'COMPLIANCE_AUDITOR') {
+        setActiveView('audit_logs');
+      } else {
+        setActiveView('analytics');
+      }
+
+      addToast({
+        type: 'success',
+        title: 'Authentication Succeeded',
+        description: `Logged in as ${res.user.name} (${res.user.role} - ${res.user.tenant}).`
+      });
+      navigate('/dashboard');
+    } catch (err: any) {
+      addToast({
+        type: 'rose',
+        title: 'Authentication Failed',
+        description: err.message || 'Invalid email or password.'
+      });
+      throw err;
+    }
   };
 
-  // Mock Login Behavior 1: Data Steward (HR)
+  const updateUserPassword = (newToken: string) => {
+    if (!user) return;
+    const updatedUser: User = {
+      ...user,
+      token: newToken,
+      mustChangePassword: false
+    };
+    setUser(updatedUser);
+    setToken(newToken);
+    sessionStorage.setItem('auth_token', newToken);
+    sessionStorage.setItem('auth_user', JSON.stringify(updatedUser));
+  };
+
   const loginAsDataSteward = () => {
-    const newUser: User = {
-      id: 'usr-steward-101',
-      name: 'Sarah Jenkins',
-      tenant: 'HR',
-      role: 'DATA_STEWARD',
-      token: generateMockJwt('DATA_STEWARD', 'HR'),
-      email: 'sarah.jenkins@enterprise.ai',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-    };
-    setUser(newUser);
-    setIsAuthenticated(true);
-    setSelectedTenant('HR');
-    setActiveView('quarantine');
-    addToast({
-      type: 'success',
-      title: 'Logged in as Data Steward (HR)',
-      description: 'JWT Issued. Redirecting to Quarantine Queue.'
-    });
-    navigate('/dashboard');
+    loginWithCredentials('hr_steward@enterprise.com', 'password123');
   };
 
-  // Mock Login Behavior 2: System Admin (GLOBAL)
   const loginAsSystemAdmin = () => {
-    const newUser: User = {
-      id: 'usr-admin-102',
-      name: 'Alex Rivera',
-      tenant: 'GLOBAL',
-      role: 'SYSTEM_ADMIN',
-      token: generateMockJwt('SYSTEM_ADMIN', 'GLOBAL'),
-      email: 'alex.rivera@enterprise.ai',
-      avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'
-    };
-    setUser(newUser);
-    setIsAuthenticated(true);
-    setSelectedTenant('ALL');
-    setActiveView('analytics');
-    addToast({
-      type: 'success',
-      title: 'Logged in as System Admin (GLOBAL)',
-      description: 'JWT Issued. Redirecting to Global Health & Infrastructure metrics.'
-    });
-    navigate('/dashboard');
+    loginWithCredentials('hr_admin@enterprise.com', 'password123');
   };
 
-  // Mock Login Behavior 3: Compliance Auditor (GLOBAL)
   const loginAsAuditor = () => {
-    const newUser: User = {
-      id: 'usr-auditor-103',
-      name: 'Marcus Vance',
-      tenant: 'GLOBAL',
-      role: 'COMPLIANCE_AUDITOR',
-      token: generateMockJwt('COMPLIANCE_AUDITOR', 'GLOBAL'),
-      email: 'marcus.vance@legal.ai',
-      avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80'
-    };
-    setUser(newUser);
-    setIsAuthenticated(true);
-    setSelectedTenant('ALL');
-    setActiveView('lineage');
-    addToast({
-      type: 'success',
-      title: 'Logged in as Compliance Auditor (GLOBAL)',
-      description: 'JWT Issued. Redirecting to Vector Lineage Traceability.'
-    });
-    navigate('/dashboard');
+    loginWithCredentials('legal_auditor@enterprise.com', 'password123');
   };
 
-  const loginWithProfile = (email: string, role: RbacRole, tenant: RbacTenant) => {
-    const userName = email.split('@')[0].replace('.', ' ').replace(/^./, str => str.toUpperCase());
-    const newUser: User = {
-      id: `usr-${Date.now().toString().slice(-4)}`,
-      name: userName || 'Enterprise User',
-      email,
-      role,
-      tenant,
-      token: generateMockJwt(role, tenant),
-      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`
-    };
-    setUser(newUser);
-    setIsAuthenticated(true);
-    if (tenant !== 'GLOBAL') setSelectedTenant(tenant as TenantScope);
-
-    addToast({
-      type: 'success',
-      title: 'JWT Authentication Issued',
-      description: `Authenticated as ${newUser.name} (${role} - ${tenant}).`
-    });
-    navigate('/dashboard');
+  const loginWithProfile = (email: string, _role: RbacRole, _tenant: RbacTenant) => {
+    loginWithCredentials(email, 'password123');
   };
 
   // Debug Role Switcher for live UI testing
   const setRoleDebug = (role: RbacRole) => {
     if (!user) return;
-    const tenant: RbacTenant = role === 'DATA_STEWARD' ? 'HR' : 'GLOBAL';
-    const updatedUser: User = {
-      ...user,
-      role,
-      tenant,
-      token: generateMockJwt(role, tenant)
-    };
-    setUser(updatedUser);
-    if (tenant !== 'GLOBAL') setSelectedTenant(tenant as TenantScope);
-    
-    // Auto-swap default view
-    if (role === 'DATA_STEWARD') setActiveView('quarantine');
-    else if (role === 'SYSTEM_ADMIN') setActiveView('analytics');
-    else if (role === 'COMPLIANCE_AUDITOR') setActiveView('lineage');
-
-    addToast({
-      type: 'info',
-      title: `Persona Switched to ${role}`,
-      description: `Swapped dashboard layout and tenant scope to ${tenant}.`
-    });
+    const targetEmail = role === 'DATA_STEWARD' ? 'hr_steward@enterprise.com' 
+      : (role === 'COMPLIANCE_AUDITOR' ? 'legal_auditor@enterprise.com' : 'hr_admin@enterprise.com');
+    loginWithCredentials(targetEmail, 'password123');
   };
 
-  const logout = () => {
-    setUser(null);
-    setIsAuthenticated(false);
-    addToast({
-      type: 'info',
-      title: 'Logged Out',
-      description: 'JWT Token revoked. Session terminated.'
-    });
-    navigate('/login');
+  const logout = async () => {
+    try {
+      const activeToken = token || sessionStorage.getItem('auth_token');
+      if (activeToken) {
+        await logoutApi(activeToken);
+      }
+    } catch (err) {
+      console.warn("Backend logout error or offline", err);
+    } finally {
+      sessionStorage.removeItem('auth_token');
+      sessionStorage.removeItem('auth_user');
+      setUser(null);
+      setToken(null);
+      setIsAuthenticated(false);
+      addToast({
+        type: 'info',
+        title: 'Logged Out',
+        description: 'JWT Token revoked. Session terminated.'
+      });
+      navigate('/login');
+    }
   };
 
   const completeOnboarding = (workspaceName: string, targetVectorDb: string, ingestionMode: string) => {
@@ -588,19 +570,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     navigate('/dashboard');
   };
 
-  // Real-time telemetry pulse effect
+  // Real telemetry and event updates driven via SSE EventSource
   useEffect(() => {
-    const interval = setInterval(() => {
-      setTelemetry(prev => ({
-        ...prev,
-        gatewayLatencyMs: Math.max(10, Math.min(24, Math.round(prev.gatewayLatencyMs + (Math.random() * 4 - 2)))),
-        rabbitMqLatencyMs: Number((prev.rabbitMqLatencyMs + (Math.random() * 0.4 - 0.2)).toFixed(1)),
-        pythonGpuLoad: Number(Math.max(40, Math.min(95, prev.pythonGpuLoad + (Math.random() * 3 - 1.5))).toFixed(1)),
-        tokensPerSec: Math.round(prev.tokensPerSec + (Math.random() * 200 - 100))
-      }));
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
+    const userToken = user?.token;
+    if (!userToken || !user?.tenant) return;
+
+    const sseUrl = `${import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:8080/api/v1'}/telemetry/stream?token=${encodeURIComponent(userToken)}`;
+    let eventSource: EventSource | null = null;
+
+    try {
+      eventSource = new EventSource(sseUrl);
+
+      eventSource.addEventListener('INIT', (e) => {
+        console.info('[SSE] Handshake acknowledged:', e.data);
+      });
+
+      eventSource.addEventListener('TELEMETRY', (e) => {
+        try {
+          const payload = JSON.parse(e.data);
+          if (payload) {
+            setTelemetry(prev => ({
+              ...prev,
+              gatewayLatencyMs: payload.gatewayLatencyMs || prev.gatewayLatencyMs,
+              tokensPerSec: payload.tokensPerSec || prev.tokensPerSec,
+            }));
+          }
+        } catch (err) {
+          console.debug('[SSE] Telemetry parse err:', err);
+        }
+      });
+
+      eventSource.addEventListener('CONFLICT_RESOLVED', (e) => {
+        try {
+          const payload = JSON.parse(e.data);
+          addToast({
+            type: 'info',
+            title: 'Conflict Resolved Real-Time',
+            description: `Conflict ${payload.conflictId} resolved via ${payload.action}.`
+          });
+        } catch (err) {}
+      });
+
+      eventSource.onerror = () => {
+        eventSource?.close();
+      };
+    } catch (e) {
+      console.warn('SSE subscription error:', e);
+    }
+
+    return () => {
+      eventSource?.close();
+    };
+  }, [user?.token, user?.tenant]);
 
   // Simulating ingestion pipeline progress
   useEffect(() => {
@@ -767,7 +788,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       navigate,
       user,
       isAuthenticated,
-      token: user?.token || null,
+      token: token || user?.token || null,
+      loginWithCredentials,
+      updateUserPassword,
       loginAsDataSteward,
       loginAsSystemAdmin,
       loginAsAuditor,

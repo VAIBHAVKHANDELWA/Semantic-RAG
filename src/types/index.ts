@@ -1,5 +1,5 @@
-export type RbacTenant = 'HR' | 'FINANCE' | 'LEGAL' | 'ENGINEERING' | 'GLOBAL';
-export type TenantScope = 'ALL' | 'HR' | 'LEGAL' | 'FINANCE' | 'ENGINEERING' | 'GLOBAL';
+export type RbacTenant = 'HR' | 'FINANCE' | 'LEGAL' | 'ENGINEERING';
+export type TenantScope = 'ALL' | 'HR' | 'LEGAL' | 'FINANCE' | 'ENGINEERING';
 
 export type RbacRole = 'DATA_STEWARD' | 'SYSTEM_ADMIN' | 'COMPLIANCE_AUDITOR';
 export type UserRole = RbacRole | 'IT_ADMIN' | 'AI_ARCHITECT' | 'LEGAL_COUNSEL';
@@ -13,6 +13,8 @@ export interface User {
   token: string;
   email?: string;
   avatarUrl?: string;
+  mustChangePassword?: boolean;
+  isSuperAdmin?: boolean;
 }
 
 export type UserProfile = User;
@@ -20,9 +22,9 @@ export type UserProfile = User;
 export type AppRoute = 
   | '/' 
   | '/login' 
-  | '/signup' 
   | '/onboarding' 
   | '/dashboard' 
+  | '/admin/users'
   | '/admin/billing' 
   | '/admin/tenants' 
   | '/admin/logs' 
@@ -38,7 +40,8 @@ export type ActiveViewType =
   | 'billing' 
   | 'tenant_mgmt' 
   | 'system_logs' 
-  | 'audit_logs';
+  | 'audit_logs'
+  | 'user_mgmt';
 
 export interface WorkspaceConfig {
   workspaceName: string;

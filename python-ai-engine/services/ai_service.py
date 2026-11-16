@@ -35,13 +35,13 @@ class AIService:
 
     def generate_embeddings(self, chunks: List[str]) -> List[List[float]]:
         """
-        Converts text chunks into 384-dimensional float vector embeddings using SentenceTransformers.
+        Converts text chunks into 384-dimensional normalized float vector embeddings using SentenceTransformers.
         """
         if not chunks:
             return []
 
         logger.info(f"Generating vector embeddings for {len(chunks)} text chunks...")
-        embeddings = self.model.encode(chunks, show_progress_bar=False)
+        embeddings = self.model.encode(chunks, normalize_embeddings=True, show_progress_bar=False)
 
         # Convert numpy arrays to standard Python float lists
         float_embeddings = [vector.tolist() for vector in embeddings]

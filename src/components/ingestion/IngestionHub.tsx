@@ -35,7 +35,7 @@ export const IngestionHub: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
 
   // Filter queue items based on active tenant scope
-  const filteredQueue = selectedTenant === 'ALL' || selectedTenant === 'GLOBAL'
+  const filteredQueue = selectedTenant === 'ALL'
     ? ingestionQueue
     : ingestionQueue.filter(i => i.department === selectedTenant);
 

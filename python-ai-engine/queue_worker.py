@@ -10,17 +10,43 @@ from services.db_service import db_service
 
 logger = logging.getLogger("python-ai-engine.worker")
 
+
 class RabbitMQWorker:
     def __init__(self):
         self.url = settings.RABBITMQ_URL
         self.queue_name = settings.RABBITMQ_QUEUE
+        self.telemetry_queue = "telemetry-queue"
+        self.dlx_name = "raw-document-dlx"
+        self.dlq_name = "raw-document-dlq"
         self.should_stop = False
         self.connection = None
         self.channel = None
 
+    def publish_telemetry(self, status: str, tenant_id: str, job_id: str, progress_percentage: int, message: str):
+        """Emits telemetry events into telemetry-queue matching Java TelemetryEvent shape."""
+        if not self.channel or not self.channel.is_open:
+            return
+        try:
+            msg = json.dumps({
+                "jobId": job_id,
+                "tenantId": tenant_id if tenant_id else "GLOBAL",
+                "status": status,
+                "progressPercentage": progress_percentage,
+                "message": message,
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S")
+            })
+            self.channel.basic_publish(
+                exchange="",
+                routing_key=self.telemetry_queue,
+                body=msg,
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+        except Exception as e:
+            logger.warning(f"Failed to publish telemetry event [{status}]: {e}")
+
     def start_listening(self):
         """
-        Connects to RabbitMQ and starts listening with prefetch backpressure control.
+        Connects to RabbitMQ with proper DLX / DLQ bindings and consumer QoS backpressure.
         """
         while not self.should_stop:
             try:
@@ -29,7 +55,23 @@ class RabbitMQWorker:
                 self.connection = pika.BlockingConnection(parameters)
                 self.channel = self.connection.channel()
 
-                self.channel.queue_declare(queue=self.queue_name, durable=True)
+                # 1. Dead Letter Exchange & Queue
+                self.channel.exchange_declare(exchange=self.dlx_name, exchange_type="direct", durable=True)
+                self.channel.queue_declare(queue=self.dlq_name, durable=True)
+                self.channel.queue_bind(queue=self.dlq_name, exchange=self.dlx_name, routing_key=self.dlq_name)
+
+                # 2. Main Ingestion Queue with DLX arguments
+                self.channel.queue_declare(
+                    queue=self.queue_name,
+                    durable=True,
+                    arguments={
+                        "x-dead-letter-exchange": self.dlx_name,
+                        "x-dead-letter-routing-key": self.dlq_name
+                    }
+                )
+
+                # 3. Telemetry Queue
+                self.channel.queue_declare(queue=self.telemetry_queue, durable=True)
 
                 # BACKPRESSURE LIMIT: Pre-fetch maximum 5 messages concurrently
                 self.channel.basic_qos(prefetch_count=5)
@@ -39,7 +81,7 @@ class RabbitMQWorker:
                     on_message_callback=self._process_message
                 )
 
-                logger.info(f"RabbitMQ Worker initialized with prefetch_count=5. Listening on queue [{self.queue_name}]...")
+                logger.info(f"RabbitMQ Worker listening on [{self.queue_name}] with DLX [{self.dlx_name}] (QoS: 5)")
                 self.channel.start_consuming()
 
             except pika.exceptions.AMQPConnectionError as e:
@@ -59,31 +101,60 @@ class RabbitMQWorker:
         Payload format: { "jobId": "...", "tenantId": "...", "objectKey": "..." }
         """
         delivery_tag = method.delivery_tag
+
+        # Check death count for retry cap (DLQ after 3 failed attempts)
+        death_count = 0
+        if properties and properties.headers and 'x-death' in properties.headers:
+            death_count = len(properties.headers['x-death'])
+
+        if death_count >= 3:
+            logger.error(f"Job exceeded 3 retry attempts (x-death={death_count}). Sending directly to DLQ: {body}")
+            ch.basic_nack(delivery_tag=delivery_tag, requeue=False)
+            return
+
+        job_id = None
+        tenant_id = None
         try:
-            payload = json.loads(body.decode("utf-8"))
+            raw_decoded = body.decode("utf-8")
+            payload = json.loads(raw_decoded)
+            if isinstance(payload, str):
+                payload = json.loads(payload)
             job_id = payload.get("jobId", f"job-{int(time.time())}")
-            tenant_id = payload.get("tenantId", "GLOBAL")
+            tenant_id = payload.get("tenantId")
             object_key = payload.get("objectKey")
 
-            logger.info(f"Received RabbitMQ Job [{job_id}] for Tenant [{tenant_id}] - Key: [{object_key}]")
+            if not tenant_id or tenant_id.upper() in ("GLOBAL", "ALL"):
+                logger.error(f"Rejecting payload without valid tenantId: {payload}")
+                ch.basic_nack(delivery_tag=delivery_tag, requeue=False)
+                return
 
             if not object_key:
                 logger.error(f"Invalid message payload: missing 'objectKey'. Payload: {payload}")
-                ch.basic_ack(delivery_tag=delivery_tag)
+                ch.basic_nack(delivery_tag=delivery_tag, requeue=False)
                 return
 
-            # Step 1: Download File Content from MinIO S3 Storage
-            raw_text = storage_service.download_file_as_text(object_key)
+            logger.info(f"Received Ingestion Job [{job_id}] for Tenant [{tenant_id}] - Key: [{object_key}]")
+
+            # Telemetry: Ingestion started
+            self.publish_telemetry("PROCESSING", tenant_id, job_id, 10, f"Extracting text from {object_key}")
+
+            # Step 1: Download & Extract Document Content via Apache Tika
+            raw_text = storage_service.download_and_extract_text(object_key)
 
             if not raw_text or not raw_text.strip():
-                logger.warning(f"File [{object_key}] contained no extractable text. Skipping pipeline processing.")
+                logger.warning(f"File [{object_key}] contained no extractable text. Marking job completed empty.")
+                db_service.update_job_counters(job_id, chunk_total=0, chunks_committed=0, chunks_quarantined=0, status="COMPLETED")
+                self.publish_telemetry("COMPLETED", tenant_id, job_id, 100, f"Empty document {object_key} processed")
                 ch.basic_ack(delivery_tag=delivery_tag)
                 return
 
-            # Step 2: Semantic Chunking via LangChain
+            # Step 2: Semantic Chunking
             chunks = ai_service.chunk_text(raw_text)
+            chunk_total = len(chunks)
 
-            # Step 3: Vector Embeddings via Local SentenceTransformers (all-MiniLM-L6-v2)
+            self.publish_telemetry("PROCESSING", tenant_id, job_id, 30, f"Generated {chunk_total} chunks, computing embeddings...")
+
+            # Step 3: Vector Embeddings
             embeddings = ai_service.generate_embeddings(chunks)
 
             # Step 4: PgVector Collision Search & Routing
@@ -91,36 +162,56 @@ class RabbitMQWorker:
             quarantine_count = 0
             committed_count = 0
 
-            for chunk_text, embedding_vec in zip(chunks, embeddings):
+            for idx, (chunk_text, embedding_vec) in enumerate(zip(chunks, embeddings)):
                 result = db_service.search_and_route_chunk(
                     job_id=job_id,
                     tenant_id=tenant_id,
                     doc_name=doc_name,
                     chunk_text=chunk_text,
-                    embedding=embedding_vec
+                    embedding=embedding_vec,
+                    chunk_index=idx
                 )
-                if result["status"] == "QUARANTINED":
+                if result.get("status") == "QUARANTINED":
                     quarantine_count += 1
-                else:
+                    self.publish_telemetry("CONFLICT_DETECTED", tenant_id, job_id, 50 + int((idx+1)/chunk_total * 40),
+                        f"Conflict detected for chunk {idx+1}/{chunk_total} with {result.get('verdict')} (similarity: {result.get('similarity'):.2f})"
+                    )
+                elif result.get("status") in ("COMMITTED", "ALREADY_COMMITTED"):
                     committed_count += 1
 
-            logger.info(
-                f"Completed Job [{job_id}]: {len(chunks)} chunks processed "
-                f"({committed_count} Committed to Vector DB, {quarantine_count} Quarantined Collisions)."
+            # Update job status and counters in PostgreSQL
+            db_service.update_job_counters(
+                job_id=job_id,
+                chunk_total=chunk_total,
+                chunks_committed=committed_count,
+                chunks_quarantined=quarantine_count,
+                status="COMPLETED"
             )
 
-            # Acknowledge message after successful pipeline execution
+            self.publish_telemetry("COMPLETED", tenant_id, job_id, 100,
+                f"Job completed: {chunk_total} chunks processed ({committed_count} committed, {quarantine_count} quarantined)"
+            )
+
+            logger.info(
+                f"Successfully completed Job [{job_id}]: {chunk_total} chunks "
+                f"({committed_count} Committed, {quarantine_count} Quarantined)."
+            )
+
+            # Acknowledge ONLY after database operations and state persistence commit
             ch.basic_ack(delivery_tag=delivery_tag)
 
         except Exception as e:
             logger.error(f"Error processing RabbitMQ message: {str(e)}", exc_info=True)
-            # Acknowledge or requeue based on error strategy (ack to avoid infinite loop on bad payloads)
-            ch.basic_ack(delivery_tag=delivery_tag)
+            if job_id:
+                try:
+                    db_service.update_job_counters(job_id, chunk_total=0, chunks_committed=0, chunks_quarantined=0, status="FAILED", error=str(e)[:1000])
+                except Exception:
+                    pass
+            # Requeue on failure so message can retry up to retry cap (3) then dead-letter
+            ch.basic_nack(delivery_tag=delivery_tag, requeue=True)
 
     def stop(self):
-        """
-        Gracefully stops consuming and closes RabbitMQ channel and connection.
-        """
+        """Gracefully stops consuming and closes RabbitMQ channel and connection."""
         logger.info("Stopping RabbitMQ Worker gracefully...")
         self.should_stop = True
         if self.channel and self.channel.is_open:
@@ -130,12 +221,14 @@ class RabbitMQWorker:
                 pass
         if self.connection and self.connection.is_open:
             try:
-                self.connection.close();
+                self.connection.close()
             except Exception:
                 pass
         logger.info("RabbitMQ Worker stopped successfully.")
 
+
 worker_instance = RabbitMQWorker()
+
 
 def start_worker_thread():
     thread = threading.Thread(target=worker_instance.start_listening, daemon=True)

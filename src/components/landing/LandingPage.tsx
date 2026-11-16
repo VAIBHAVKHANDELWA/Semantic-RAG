@@ -49,10 +49,10 @@ export const LandingPage: React.FC = () => {
             Sign In
           </button>
           <button
-            onClick={() => navigate(isAuthenticated ? '/dashboard' : '/signup')}
+            onClick={() => navigate(isAuthenticated ? '/dashboard' : '/login')}
             className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg shadow-cyan-500/20 transition-all hover:scale-105"
           >
-            <span>{isAuthenticated ? 'Launch Platform' : 'Get Started'}</span>
+            <span>{isAuthenticated ? 'Launch Platform' : 'Access Gateway'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
@@ -104,10 +104,10 @@ export const LandingPage: React.FC = () => {
           className="flex flex-wrap items-center justify-center gap-4 pt-2"
         >
           <button
-            onClick={() => navigate('/signup')}
+            onClick={() => navigate('/login')}
             className="px-7 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-extrabold text-sm flex items-center gap-2 shadow-xl shadow-cyan-500/25 transition-all hover:scale-105"
           >
-            <span>Get Started Free</span>
+            <span>Sign In to Platform</span>
             <ArrowRight className="w-4 h-4" />
           </button>
           <button
@@ -259,7 +259,6 @@ export const LandingPage: React.FC = () => {
         </div>
         <div className="flex items-center gap-6">
           <span className="text-slate-400 hover:text-slate-200 cursor-pointer" onClick={() => navigate('/login')}>Login</span>
-          <span className="text-slate-400 hover:text-slate-200 cursor-pointer" onClick={() => navigate('/signup')}>Sign Up</span>
           <span className="text-slate-400 hover:text-slate-200 cursor-pointer" onClick={() => navigate('/dashboard')}>Dashboard</span>
         </div>
       </footer>

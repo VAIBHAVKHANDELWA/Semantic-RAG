@@ -1,0 +1,5 @@
+#!/bin/bash
+set -e
+echo "Executing Seed Script for Enterprise Semantic RAG Governance Platform..."
+python3 seed.py
+

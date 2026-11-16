@@ -107,7 +107,7 @@ export const LineageGraph: React.FC<LineageGraphProps> = ({ conflictId, isModal 
       id: 'node-vector-db',
       type: 'vector_db',
       title: 'Vector DB Index: b2b_policies',
-      subtitle: 'Qdrant / Milvus Isolated Namespace',
+      subtitle: 'pgvector 384-dim Isolated Namespace',
       status: conflict.status === 'PENDING' ? 'quarantined' : 'clean',
       metadata: {
         docName: 'b2b_policies_vector_v4',

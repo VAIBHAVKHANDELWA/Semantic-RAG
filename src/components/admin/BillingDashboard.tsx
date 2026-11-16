@@ -130,7 +130,7 @@ export const BillingDashboard: React.FC = () => {
             </div>
           </div>
           <div className="text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/80 flex justify-between">
-            <span>Qdrant HNSW Index Footprint:</span>
+            <span>pgvector HNSW Index Footprint:</span>
             <span className="text-emerald-300 font-bold">-38% Compression</span>
           </div>
         </GlassCard>

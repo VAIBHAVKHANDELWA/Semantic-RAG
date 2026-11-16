@@ -1,0 +1,99 @@
+﻿services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: semantic-rag-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: semantic_rag_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: adminpassword
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d semantic_rag_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: semantic-rag-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: adminpassword
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  # MinIO's Docker images were removed from Docker Hub, so this is RustFS,
+  # an S3-compatible object store listening on the same port (9000).
+  rustfs:
+    image: rustfs/rustfs:latest
+    container_name: semantic-rag-rustfs
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      RUSTFS_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      RUSTFS_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ADDRESS: ":9001"
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_CORS_ALLOWED_ORIGINS: "*"
+    volumes:
+      - rustfs_data:/data
+
+  rustfs-init:
+    image: rustfs/rc:latest
+    container_name: semantic-rag-rustfs-init
+    depends_on:
+      - rustfs
+    environment:
+      RUSTFS_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      RUSTFS_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until /usr/bin/rc alias set rustfs http://rustfs:9000 "$${RUSTFS_ACCESS_KEY}" "$${RUSTFS_SECRET_KEY}"; do
+          echo "Waiting for RustFS..."; sleep 2
+        done
+        /usr/bin/rc bucket create rustfs/semantic-rag-uploads || true
+        echo "Bucket ready."
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: semantic-rag-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --save "" --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  tika:
+    image: apache/tika:2.9.2.0-full
+    container_name: semantic-rag-tika
+    restart: unless-stopped
+    ports:
+      - "9998:9998"
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+  rustfs_data:

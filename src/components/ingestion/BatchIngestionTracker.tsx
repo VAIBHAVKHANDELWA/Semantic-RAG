@@ -16,7 +16,7 @@ import { motion } from 'framer-motion';
 export const BatchIngestionTracker: React.FC = () => {
   const { batchJobs, sseLogs, isThrottled, selectedTenant } = useApp();
 
-  const filteredJobs = selectedTenant === 'ALL' || selectedTenant === 'GLOBAL'
+  const filteredJobs = selectedTenant === 'ALL'
     ? batchJobs
     : batchJobs.filter(j => j.department === selectedTenant);
 

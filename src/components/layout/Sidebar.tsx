@@ -14,7 +14,8 @@ import {
   FileCheck,
   Activity,
   UserCheck,
-  Brain
+  Brain,
+  Users
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -74,6 +75,11 @@ export const Sidebar: React.FC = () => {
             id: 'analytics',
             label: 'Global Health & Metrics',
             icon: Activity
+          },
+          {
+            id: 'user_mgmt',
+            label: 'User Governance',
+            icon: Users
           },
           {
             id: 'billing',
@@ -217,7 +223,7 @@ export const Sidebar: React.FC = () => {
                 <span className="text-[10px] font-mono text-emerald-400">ACTIVE</span>
               </div>
               <div className="mt-1 text-[10px] text-slate-400 font-mono truncate">
-                {selectedTenant === 'ALL' || selectedTenant === 'GLOBAL' ? 'Global Multi-Tenant' : currentTenantObj?.isolationLevel}
+                {selectedTenant === 'ALL' ? 'Global Multi-Tenant' : currentTenantObj?.isolationLevel}
               </div>
             </div>
 

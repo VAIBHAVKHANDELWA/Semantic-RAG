@@ -480,7 +480,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     timestamp: '2026-09-17 19:15:00',
     actorName: 'Alex Rivera',
     actorRole: 'SYSTEM_ADMIN',
-    department: 'GLOBAL',
+    department: 'ENGINEERING',
     action: 'RATE_LIMIT_CHANGE',
     targetId: 't-eng',
     details: 'Increased Engineering tenant worker rate limit to 1,200 req/min for high-throughput batch indexing.',

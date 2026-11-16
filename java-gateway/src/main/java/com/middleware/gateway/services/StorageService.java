@@ -28,7 +28,11 @@ public class StorageService {
      * Object Key Format: uploads/{tenantId}/{uuid}-{fileName}
      */
     public UploadTicketResponseDTO generatePresignedUploadTicket(String fileName, String tenantId) {
-        String sanitizedTenant = (tenantId == null || tenantId.isBlank()) ? "GLOBAL" : tenantId.trim().toUpperCase();
+        if (tenantId == null || tenantId.trim().isEmpty() || "GLOBAL".equalsIgnoreCase(tenantId) || "ALL".equalsIgnoreCase(tenantId)) {
+            throw new IllegalArgumentException("Tenant ID is strictly required for upload ticket generation. No wildcard/global fallback permitted.");
+        }
+
+        String sanitizedTenant = tenantId.trim().toUpperCase();
         String sanitizedFileName = (fileName != null) ? fileName.replaceAll("[^a-zA-Z0-9_.-]", "_") : "unnamed_document.pdf";
         String uuid = UUID.randomUUID().toString().substring(0, 8);
 
@@ -51,7 +55,8 @@ public class StorageService {
         PresignedPutObjectRequest presignedPut = s3Presigner.presignPutObject(presignRequest);
         String uploadUrl = presignedPut.url().toString();
 
-        log.debug("Issued MinIO Presigned URL for Ticket [{}]: {}", ticketId, uploadUrl);
+        // Security fix: Log ticket generation without exposing full sensitive presigned authorization token at debug/info
+        log.info("Issued MinIO Presigned Ticket [{}] for ObjectKey [{}] (valid for 15 minutes)", ticketId, objectKey);
 
         return UploadTicketResponseDTO.builder()
                 .ticketId(ticketId)
