@@ -49,6 +49,72 @@ def health_check():
     }
 
 
+@app.get("/api/v1/telemetry")
+@app.get("/telemetry")
+def get_telemetry():
+    """
+    T0.5 / ITEM 2: Real telemetry endpoint exposing counters and extraction timings from Redis.
+    Counters: processed, duplicates_pruned, quarantined, dlq.
+    Timings: last_extraction_latency_ms, average_extraction_latency_ms.
+    """
+    from services.db_service import db_service
+    rc = db_service.redis_client
+
+    if not rc:
+        return {
+            "status": "degraded",
+            "message": "Redis disconnected; returning zeroed telemetry.",
+            "processed": 0,
+            "duplicates": 0,
+            "quarantined": 0,
+            "dlq": 0,
+            "extractionLatency": {
+                "lastMs": 0.0,
+                "avgMs": 0.0,
+                "sampleCount": 0
+            }
+        }
+
+    try:
+        processed = int(rc.get("metrics:processed_total") or 0)
+        duplicates = int(rc.get("metrics:dedup_pruned:total") or 0)
+        quarantined = int(rc.get("metrics:quarantined_total") or 0)
+        dlq = int(rc.get("metrics:dlq_total") or 0)
+        last_latency = float(rc.get("metrics:last_extraction_latency_ms") or 0.0)
+
+        raw_latencies = rc.lrange("metrics:extraction_latencies", 0, 99) or []
+        latencies = [float(x) for x in raw_latencies if x]
+        avg_latency = round(sum(latencies) / len(latencies), 2) if latencies else 0.0
+
+        return {
+            "status": "healthy",
+            "processed": processed,
+            "duplicates": duplicates,
+            "quarantined": quarantined,
+            "dlq": dlq,
+            "extractionLatency": {
+                "lastMs": last_latency,
+                "avgMs": avg_latency,
+                "sampleCount": len(latencies)
+            }
+        }
+    except Exception as e:
+        logger.warning(f"Error querying telemetry metrics: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "processed": 0,
+            "duplicates": 0,
+            "quarantined": 0,
+            "dlq": 0,
+            "extractionLatency": {
+                "lastMs": 0.0,
+                "avgMs": 0.0,
+                "sampleCount": 0
+            }
+        }
+
+
 class ClusterRequest(BaseModel):
     tenantId: str
     eps: Optional[float] = 0.15

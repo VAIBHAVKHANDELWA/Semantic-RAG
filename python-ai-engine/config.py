@@ -24,5 +24,6 @@ class Settings:
     CHUNK_SIZE: int = int(os.getenv("CHUNK_SIZE", "500"))
     CHUNK_OVERLAP: int = int(os.getenv("CHUNK_OVERLAP", "50"))
     SIMILARITY_THRESHOLD: float = float(os.getenv("SIMILARITY_THRESHOLD", "0.85"))
+    MAX_RETRIES: int = int(os.getenv("MAX_RETRIES", "3"))
 
 settings = Settings()
