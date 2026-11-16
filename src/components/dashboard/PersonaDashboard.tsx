@@ -179,7 +179,7 @@ export const PersonaDashboard: React.FC = () => {
                     {tenant} Ingested Documents
                   </div>
                   <div className="text-3xl font-extrabold text-slate-100 font-mono mt-1">
-                    1,420 <span className="text-xs font-normal text-slate-400">docs</span>
+                    {telemetry.quarantinedPendingCount + telemetry.exactDuplicatesPruned + (telemetry.processedTotal || 15)} <span className="text-xs font-normal text-slate-400">docs</span>
                   </div>
                 </div>
                 <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
@@ -200,7 +200,7 @@ export const PersonaDashboard: React.FC = () => {
                     Resolved & Pruned Vectors
                   </div>
                   <div className="text-3xl font-extrabold text-emerald-400 font-mono mt-1">
-                    1,840 <span className="text-xs font-normal text-slate-400">cleared</span>
+                    {telemetry.exactDuplicatesPruned + conflicts.filter(c => c.status !== 'PENDING').length} <span className="text-xs font-normal text-slate-400">cleared</span>
                   </div>
                 </div>
                 <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">

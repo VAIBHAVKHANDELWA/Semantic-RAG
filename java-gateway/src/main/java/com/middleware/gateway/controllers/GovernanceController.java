@@ -61,7 +61,7 @@ public class GovernanceController {
      * Resolves a quarantine conflict, records hash-chained audit log, and writes provenance edge.
      */
     @PostMapping("/quarantine/{id}/resolve")
-    @PreAuthorize("hasAnyRole('DATA_STEWARD', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasRole('DATA_STEWARD')")
     public ResponseEntity<QuarantineConflict> resolveConflict(
             @PathVariable("id") String id,
             @RequestBody ConflictResolutionRequestDTO request,
@@ -71,12 +71,17 @@ public class GovernanceController {
         String actorId = extractUserId(authentication);
         String actorRole = extractRole(authentication);
 
+        if (request.getReason() == null || request.getReason().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Resolution reason is required and cannot be empty");
+        }
+
         QuarantineConflict resolved = governanceService.resolveConflict(
                 id,
                 tenantId,
                 actorId,
                 actorRole,
                 request.getAction(),
+                request.getReason(),
                 request.getMergedText()
         );
         return ResponseEntity.ok(resolved);
@@ -109,7 +114,7 @@ public class GovernanceController {
      * Fetches provenance edges for lineage graph rendering.
      */
     @GetMapping("/provenance/{conflictId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('DATA_STEWARD', 'SYSTEM_ADMIN')")
     public ResponseEntity<List<ProvenanceEdge>> getProvenanceEdges(
             @PathVariable("conflictId") String conflictId,
             Authentication authentication
@@ -121,8 +126,13 @@ public class GovernanceController {
     private String extractTenant(Authentication authentication) {
         if (authentication != null && authentication.getPrincipal() instanceof UserPrincipal principal) {
             String tenant = principal.getTenant();
-            if (tenant != null && !tenant.trim().isEmpty() && !"GLOBAL".equalsIgnoreCase(tenant) && !"ALL".equalsIgnoreCase(tenant)) {
-                return tenant.trim().toUpperCase();
+            if (tenant != null && !tenant.trim().isEmpty()) {
+                if ("SYSTEM_ADMIN".equalsIgnoreCase(principal.getRole())) {
+                    return tenant.trim().toUpperCase();
+                }
+                if (!"GLOBAL".equalsIgnoreCase(tenant) && !"ALL".equalsIgnoreCase(tenant)) {
+                    return tenant.trim().toUpperCase();
+                }
             }
         }
         throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access Denied: Missing or invalid tenant in JWT token");

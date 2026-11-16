@@ -12,4 +12,5 @@ public interface ComplianceAuditLogRepository extends JpaRepository<ComplianceAu
     List<ComplianceAuditLog> findByTenantIdOrderByCreatedAtDesc(String tenantId);
     List<ComplianceAuditLog> findByTenantIdOrderByCreatedAtAsc(String tenantId);
     Optional<ComplianceAuditLog> findTopByTenantIdOrderByCreatedAtDesc(String tenantId);
+    long countByTenantId(String tenantId);
 }

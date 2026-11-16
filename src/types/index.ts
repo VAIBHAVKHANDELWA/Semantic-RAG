@@ -144,6 +144,7 @@ export interface SystemTelemetry {
   exactDuplicatesPruned: number;
   redisCacheHits: number;
   totalChunksProcessed: number;
+  processedTotal?: number;
   vectorRamSavedGb: number;
   llmCostSavedUsd: number;
   quarantinedPendingCount: number;

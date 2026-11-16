@@ -19,7 +19,11 @@ import math
 import random
 import psycopg2
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://admin:adminpassword@localhost:5432/semantic_rag_db")
+# Database connection string with environment variable overrides and demo defaults
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    f"postgresql://{os.getenv('POSTGRES_USER', 'admin')}:{os.getenv('POSTGRES_PASSWORD', 'adminpassword')}@{os.getenv('POSTGRES_HOST', 'localhost')}:{os.getenv('POSTGRES_PORT', '5432')}/semantic_rag_db"
+)
 
 # Standard BCrypt hash for "password123"
 BCRYPT_HASH = "$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG"

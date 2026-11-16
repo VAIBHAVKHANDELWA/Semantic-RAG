@@ -13,6 +13,18 @@ export const DbscanClusterChart: React.FC = () => {
 
   const activeCluster = clusters.find(c => c.id === selectedClusterId) || hoveredCluster || clusters[0];
 
+  if (!activeCluster || clusters.length === 0) {
+    return (
+      <div className="rounded-2xl bg-slate-950 border border-slate-800 p-12 text-center text-slate-400">
+        <Network className="w-10 h-10 text-cyan-400 mx-auto mb-3 opacity-60" />
+        <h3 className="text-sm font-semibold text-slate-200 uppercase tracking-wider">No Quarantined Clusters Discovered</h3>
+        <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+          Unsupervised DBSCAN clustering analyzes quarantined chunks when collisions occur. No active topic clusters currently flagged.
+        </p>
+      </div>
+    );
+  }
+
   const handleClusterClick = (cluster: DbscanCluster) => {
     setSelectedClusterId(cluster.id);
   };

@@ -102,13 +102,33 @@ class RabbitMQWorker:
         """
         delivery_tag = method.delivery_tag
 
-        # Check death count for retry cap (DLQ after 3 failed attempts)
+        # Check death count for retry cap (DLQ after configurable max retries, default 3)
         death_count = 0
         if properties and properties.headers and 'x-death' in properties.headers:
             death_count = len(properties.headers['x-death'])
 
-        if death_count >= 3:
-            logger.error(f"Job exceeded 3 retry attempts (x-death={death_count}). Sending directly to DLQ: {body}")
+        max_retries = getattr(settings, "MAX_RETRIES", 3)
+        if death_count >= max_retries:
+            logger.error(f"Job exceeded {max_retries} retry attempts (x-death={death_count}). Moving to DLQ: {body}")
+            if db_service.redis_client:
+                try:
+                    db_service.redis_client.incr("metrics:dlq_total")
+                except Exception:
+                    pass
+            try:
+                raw_payload = json.loads(body.decode("utf-8"))
+                if isinstance(raw_payload, str):
+                    raw_payload = json.loads(raw_payload)
+                j_id = raw_payload.get("jobId")
+                t_id = raw_payload.get("tenantId", "GLOBAL")
+                if j_id:
+                    db_service.update_job_counters(
+                        job_id=j_id, chunk_total=0, chunks_committed=0, chunks_quarantined=0,
+                        status="FAILED_DLQ", error=f"Exceeded {max_retries} attempts (x-death={death_count})"
+                    )
+                    self.publish_telemetry("DLQ", t_id, j_id, 100, f"Dead-lettered after {death_count} attempts")
+            except Exception:
+                pass
             ch.basic_nack(delivery_tag=delivery_tag, requeue=False)
             return
 
@@ -133,18 +153,51 @@ class RabbitMQWorker:
                 ch.basic_nack(delivery_tag=delivery_tag, requeue=False)
                 return
 
+            doc_name = object_key.split("/")[-1]
             logger.info(f"Received Ingestion Job [{job_id}] for Tenant [{tenant_id}] - Key: [{object_key}]")
 
             # Telemetry: Ingestion started
             self.publish_telemetry("PROCESSING", tenant_id, job_id, 10, f"Extracting text from {object_key}")
 
-            # Step 1: Download & Extract Document Content via Apache Tika
-            raw_text = storage_service.download_and_extract_text(object_key)
+            # Step 1: Download & Extract Document Content via Apache Tika with Latency Tracking
+            try:
+                raw_text, latency_ms = storage_service.download_and_extract(object_key)
+            except Exception as extract_err:
+                logger.error(f"Failed extraction or corrupt file [{object_key}]: {extract_err}")
+                conflict_id = db_service.quarantine_corrupt_or_empty_document(
+                    job_id=job_id,
+                    tenant_id=tenant_id,
+                    doc_name=doc_name,
+                    reason=f"Failed extraction / corrupt file: {str(extract_err)[:500]}",
+                    verdict_type="CORRUPT_FILE"
+                )
+                self.publish_telemetry("QUARANTINED", tenant_id, job_id, 100,
+                    f"Corrupt or unreadable document quarantined ({conflict_id})"
+                )
+                ch.basic_ack(delivery_tag=delivery_tag)
+                return
+
+            # Record extraction latency in Redis metrics
+            if db_service.redis_client:
+                try:
+                    db_service.redis_client.set("metrics:last_extraction_latency_ms", round(latency_ms, 2))
+                    db_service.redis_client.lpush("metrics:extraction_latencies", round(latency_ms, 2))
+                    db_service.redis_client.ltrim("metrics:extraction_latencies", 0, 99)
+                except Exception:
+                    pass
 
             if not raw_text or not raw_text.strip():
-                logger.warning(f"File [{object_key}] contained no extractable text. Marking job completed empty.")
-                db_service.update_job_counters(job_id, chunk_total=0, chunks_committed=0, chunks_quarantined=0, status="COMPLETED")
-                self.publish_telemetry("COMPLETED", tenant_id, job_id, 100, f"Empty document {object_key} processed")
+                logger.warning(f"File [{object_key}] contained no extractable text. Quarantining as EMPTY_FILE.")
+                conflict_id = db_service.quarantine_corrupt_or_empty_document(
+                    job_id=job_id,
+                    tenant_id=tenant_id,
+                    doc_name=doc_name,
+                    reason="Document contained 0 bytes of extractable text.",
+                    verdict_type="EMPTY_FILE"
+                )
+                self.publish_telemetry("QUARANTINED", tenant_id, job_id, 100,
+                    f"Empty document quarantined ({conflict_id})"
+                )
                 ch.basic_ack(delivery_tag=delivery_tag)
                 return
 
@@ -158,7 +211,6 @@ class RabbitMQWorker:
             embeddings = ai_service.generate_embeddings(chunks)
 
             # Step 4: PgVector Collision Search & Routing
-            doc_name = object_key.split("/")[-1]
             quarantine_count = 0
             committed_count = 0
 
@@ -196,6 +248,16 @@ class RabbitMQWorker:
                 f"Successfully completed Job [{job_id}]: {chunk_total} chunks "
                 f"({committed_count} Committed, {quarantine_count} Quarantined)."
             )
+
+            # Record processed metrics in Redis and invalidate query cache if new chunks committed
+            if db_service.redis_client:
+                try:
+                    db_service.redis_client.incr("metrics:processed_total")
+                    db_service.redis_client.incr(f"metrics:processed:{tenant_id}")
+                    if committed_count > 0:
+                        db_service.invalidate_tenant_query_cache(tenant_id)
+                except Exception:
+                    pass
 
             # Acknowledge ONLY after database operations and state persistence commit
             ch.basic_ack(delivery_tag=delivery_tag)

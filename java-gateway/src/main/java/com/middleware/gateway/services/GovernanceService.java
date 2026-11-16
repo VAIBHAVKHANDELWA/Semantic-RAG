@@ -50,12 +50,19 @@ public class GovernanceService {
             String actorId,
             String actorRole,
             String action,
+            String reason,
             String mergedText
     ) {
         QuarantineConflict conflict = getConflictById(conflictId, tenantId);
 
         String normalizedAction = (action != null) ? action.trim().toUpperCase() : "KEEP_EXISTING";
-        conflict.setStatus("RESOLVED_" + normalizedAction);
+        if ("APPROVE".equalsIgnoreCase(normalizedAction)) {
+            normalizedAction = "PROMOTED_INCOMING";
+        } else if ("REJECT".equalsIgnoreCase(normalizedAction)) {
+            normalizedAction = "REJECT_INCOMING";
+        }
+
+        conflict.setStatus(normalizedAction);
         conflict.setResolutionAction(normalizedAction);
         conflict.setResolvedBy(actorId);
         conflict.setResolvedAt(LocalDateTime.now());
@@ -79,8 +86,8 @@ public class GovernanceService {
                 .map(ComplianceAuditLog::getIntegrityHash)
                 .orElse("0000000000000000000000000000000000000000000000000000000000000000");
 
-        String details = String.format("Resolved conflict %s via %s by %s. Target: %s",
-                conflictId, normalizedAction, actorId, conflict.getDocumentId());
+        String details = String.format("Resolved conflict %s via %s (Reason: %s) by %s. Target: %s",
+                conflictId, normalizedAction, reason.trim(), actorId, conflict.getDocumentId());
 
         String hashPayload = prevHash + auditId + actorId + ("RESOLVE_" + normalizedAction) + conflictId + details;
         String integrityHash = computeSha256(hashPayload);
@@ -140,6 +147,14 @@ public class GovernanceService {
                 result.put("tamperedAt", logEntry.getId());
                 result.put("index", i);
                 result.put("reason", "Broken prev_hash chain link");
+                result.put("firstBrokenEntry", Map.of(
+                        "id", logEntry.getId(),
+                        "index", i,
+                        "tenantId", tenantId,
+                        "actualPrevHash", logEntry.getPrevHash(),
+                        "expectedPrevHash", expectedPrevHash,
+                        "reason", "Broken prev_hash chain link"
+                ));
                 return result;
             }
 
@@ -153,6 +168,14 @@ public class GovernanceService {
                 result.put("tamperedAt", logEntry.getId());
                 result.put("index", i);
                 result.put("reason", "SHA-256 checksum mismatch (row data altered)");
+                result.put("firstBrokenEntry", Map.of(
+                        "id", logEntry.getId(),
+                        "index", i,
+                        "tenantId", tenantId,
+                        "storedHash", logEntry.getIntegrityHash(),
+                        "recalculatedHash", recalculated,
+                        "reason", "SHA-256 checksum mismatch (row data altered)"
+                ));
                 return result;
             }
 
@@ -168,6 +191,9 @@ public class GovernanceService {
 
     @Transactional(readOnly = true)
     public List<ProvenanceEdge> getProvenanceEdges(String conflictId, String tenantId) {
+        if ("GLOBAL".equalsIgnoreCase(tenantId) || "ALL".equalsIgnoreCase(tenantId)) {
+            return provenanceRepository.findByCreatedByConflictId(conflictId);
+        }
         return provenanceRepository.findByTenantIdAndCreatedByConflictId(tenantId, conflictId);
     }
 

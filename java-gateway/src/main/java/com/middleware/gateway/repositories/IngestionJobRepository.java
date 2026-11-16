@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface IngestionJobRepository extends JpaRepository<IngestionJob, String> {
     List<IngestionJob> findByTenantIdOrderByCreatedAtDesc(String tenantId);
+    long countByTenantId(String tenantId);
 }

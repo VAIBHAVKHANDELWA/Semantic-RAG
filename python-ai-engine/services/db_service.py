@@ -39,6 +39,24 @@ class DatabaseService:
             self.redis_client = None
             self._local_dedup = set()
 
+    def invalidate_tenant_query_cache(self, tenant_id: str) -> int:
+        """
+        Invalidates all cached RAG query responses for a given tenant in Redis.
+        Called automatically upon document ingestion or state changes.
+        """
+        if not self.redis_client:
+            return 0
+        try:
+            pattern = f"rag:query:{tenant_id.strip().upper()}:*"
+            keys = self.redis_client.keys(pattern)
+            if keys:
+                self.redis_client.delete(*keys)
+                logger.info(f"Invalidated {len(keys)} cached query entries for Tenant [{tenant_id}].")
+                return len(keys)
+        except Exception as e:
+            logger.warning(f"Query cache invalidation error: {e}")
+        return 0
+
     def get_connection(self):
         conn = psycopg2.connect(self.db_url)
         register_vector(conn)
@@ -211,6 +229,13 @@ class DatabaseService:
 
                         conn.commit()
 
+                        if self.redis_client:
+                            try:
+                                self.redis_client.incr("metrics:quarantined_total")
+                                self.redis_client.incr(f"metrics:quarantined:{sanitized_tenant}")
+                            except Exception:
+                                pass
+
                         return {
                             "status": "QUARANTINED",
                             "conflict_id": conflict_id,
@@ -239,6 +264,82 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"Database operation failed for chunk [{chunk_id}]: {str(e)}", exc_info=True)
             raise RuntimeError(f"Database error during vector search and route: {str(e)}")
+
+    def quarantine_corrupt_or_empty_document(
+        self,
+        job_id: str,
+        tenant_id: str,
+        doc_name: str,
+        reason: str,
+        verdict_type: str = "EXTRACTION_FAILED"
+    ) -> str:
+        """
+        Quarantines failed extraction, empty, corrupt, or suspicious documents into quarantine_queue.
+        Ensures the document is recorded with an explicit reason rather than silently dropped.
+        """
+        sanitized_tenant = tenant_id.strip().upper()
+        conflict_id = f"conf-err-{uuid.uuid4().hex[:8]}"
+        doc_id = f"doc-{job_id}"
+
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cur:
+                    # 0. Ensure ingestion_jobs record exists
+                    cur.execute("""
+                        INSERT INTO ingestion_jobs (id, tenant_id, object_key, file_name, status)
+                        VALUES (%s, %s, %s, %s, 'PROCESSING')
+                        ON CONFLICT (id) DO NOTHING;
+                    """, (job_id, sanitized_tenant, f"uploads/{doc_name}", doc_name))
+
+                    # 1. Ensure document record exists
+                    cur.execute("""
+                        INSERT INTO documents (id, tenant_id, job_id, name, status)
+                        VALUES (%s, %s, %s, %s, 'QUARANTINED')
+                        ON CONFLICT (id) DO UPDATE SET status = 'QUARANTINED';
+                    """, (doc_id, sanitized_tenant, job_id, doc_name))
+
+                    # 2. Insert into quarantine_queue
+                    placeholder_text = f"[FAILED_EXTRACTION: {doc_name}] - {reason}"
+                    cur.execute("""
+                        INSERT INTO quarantine_queue (
+                            id, job_id, tenant_id, document_id, existing_document,
+                            incoming_chunk_text, existing_chunk_id, existing_chunk_text,
+                            similarity_score, verdict_type, verdict_confidence,
+                            contradiction_explanation, status
+                        ) VALUES (%s, %s, %s, %s, %s, %s, NULL, NULL, 0.0, %s, 1.0, %s, 'PENDING');
+                    """, (
+                        conflict_id, job_id, sanitized_tenant, doc_id, doc_name,
+                        placeholder_text, verdict_type, reason
+                    ))
+                    conn.commit()
+
+            # 3. Update job counters
+            self.update_job_counters(
+                job_id=job_id,
+                chunk_total=0,
+                chunks_committed=0,
+                chunks_quarantined=1,
+                status="QUARANTINED",
+                error=reason
+            )
+
+            # 4. Telemetry metrics in Redis
+            if self.redis_client:
+                try:
+                    self.redis_client.incr("metrics:quarantined_total")
+                    self.redis_client.incr(f"metrics:quarantined:{sanitized_tenant}")
+                except Exception:
+                    pass
+
+            logger.warning(
+                f"Quarantined unreadable/corrupt document [{doc_name}] in Tenant [{sanitized_tenant}] "
+                f"with reason: [{reason}]. Conflict ID: [{conflict_id}]"
+            )
+            return conflict_id
+
+        except Exception as e:
+            logger.error(f"Failed to record quarantine entry for [{doc_name}]: {e}", exc_info=True)
+            raise RuntimeError(f"Database error during corrupt document quarantine: {e}")
 
     def update_job_counters(self, job_id: str, chunk_total: int, chunks_committed: int, chunks_quarantined: int, status: str = "COMPLETED", error: str = None):
         """Updates ingestion_jobs row metrics atomically upon batch completion."""

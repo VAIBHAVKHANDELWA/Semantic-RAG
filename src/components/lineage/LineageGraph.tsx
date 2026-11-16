@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   GitFork, 
   FileText, 
@@ -10,6 +10,7 @@ import {
   Info
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { fetchProvenanceEdges, type ProvenanceEdge } from '../../api/lineage';
 import { NodeInspector } from './NodeInspector';
 import type { LineageNodeData } from './NodeInspector';
 import { motion } from 'framer-motion';
@@ -26,11 +27,40 @@ export const LineageGraph: React.FC<LineageGraphProps> = ({ conflictId, isModal 
   const activeConflictId = conflictId || selectedConflictId || 'conf-8901';
   const conflict = conflicts.find(c => c.id === activeConflictId) || conflicts[0];
 
+  if (!conflict) {
+    return (
+      <div className="rounded-2xl bg-slate-950 border border-slate-800 p-12 text-center text-slate-400">
+        <GitFork className="w-10 h-10 text-cyan-400 mx-auto mb-3 opacity-60" />
+        <h3 className="text-sm font-semibold text-slate-200 uppercase tracking-wider">No Conflict Lineage Available</h3>
+        <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+          Traceability graph visualizes the document-to-chunk provenance chain for quarantined collisions. No conflict currently selected.
+        </p>
+      </div>
+    );
+  }
+
   const [selectedNode, setSelectedNode] = useState<LineageNodeData | null>(null);
+  const [provenanceEdges, setProvenanceEdges] = useState<ProvenanceEdge[]>([]);
+
+  useEffect(() => {
+    const targetId = conflict?.id || activeConflictId;
+    if (targetId) {
+      fetchProvenanceEdges(targetId)
+        .then(edges => {
+          if (edges && edges.length > 0) {
+            setProvenanceEdges(edges);
+          }
+        })
+        .catch(err => {
+          console.warn('Could not fetch provenance edges for lineage graph:', err);
+        });
+    }
+  }, [conflict?.id, activeConflictId]);
 
   // Nodes for the dynamic provenance graph with temporal status styling
   const existingIsArchived = conflict?.status === 'PROMOTED_INCOMING_ARCHIVED_OLD' || conflict?.status === 'ACCEPTED_INCOMING';
   const incomingIsPromoted = conflict?.status === 'PROMOTED_INCOMING_ARCHIVED_OLD' || conflict?.status === 'ACCEPTED_INCOMING';
+  const primaryEdge = provenanceEdges[0];
 
   const graphNodes: LineageNodeData[] = [
     {
@@ -93,14 +123,14 @@ export const LineageGraph: React.FC<LineageGraphProps> = ({ conflictId, isModal 
       id: 'node-conflict-1',
       type: 'conflict_node',
       title: `Collision (${(conflict.similarityScore * 100).toFixed(1)}% Cosine)`,
-      subtitle: conflict.status === 'PENDING' ? 'Quarantined Holding Tank' : `Resolved: ${conflict.status}`,
+      subtitle: primaryEdge ? `DB Relation: ${primaryEdge.relation}` : (conflict.status === 'PENDING' ? 'Quarantined Holding Tank' : `Resolved: ${conflict.status}`),
       status: conflict.status === 'PENDING' ? 'quarantined' : 'clean',
       metadata: {
         docName: conflict?.existingChunk.docName,
         similarity: conflict?.similarityScore,
         tenantScope: conflict?.department,
         temporalStatus: conflict.status === 'PENDING' ? 'Quarantined' : 'Active',
-        executionLog: `[00:00.410] Cosine collision detected (${(conflict.similarityScore * 100).toFixed(1)}%).\n[00:00.430] LLM Verdict: ${conflict.verdictType}.\n[00:00.450] Temporal Status: ${conflict.status}.`
+        executionLog: `[00:00.410] Cosine collision detected (${(conflict.similarityScore * 100).toFixed(1)}%).\n[00:00.430] LLM Verdict: ${conflict.verdictType}.\n[00:00.450] Temporal Status: ${conflict.status}.${primaryEdge ? `\n[DB Provenance Edge] ID: ${primaryEdge.id} | Relation: ${primaryEdge.relation} | Linked: ${primaryEdge.fromChunkId} -> ${primaryEdge.toChunkId}` : ''}`
       }
     },
     {

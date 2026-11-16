@@ -20,17 +20,34 @@ import type {
   SseTelemetryPayload,
   ChunkMetadata
 } from '../types';
-import { 
-  INITIAL_TENANTS, 
-  INITIAL_INGESTION_QUEUE, 
-  INITIAL_QUARANTINE_CONFLICTS, 
-  INITIAL_DBSCAN_CLUSTERS, 
-  INITIAL_TELEMETRY, 
-  INITIAL_NOTIFICATIONS,
-  INITIAL_AUDIT_LOGS,
-  INITIAL_ARCHIVED_CHUNKS
-} from '../data/mockData';
 import { loginApi, logoutApi } from '../api/client';
+import { fetchPendingConflicts, resolveConflict as apiResolveConflict } from '../api/quarantine';
+import { fetchAuditLogs } from '../api/audit';
+import { fetchClusters } from '../api/clusters';
+
+const DEFAULT_TENANTS: Tenant[] = [
+  { id: 'HR', name: 'Human Resources & People Ops', code: 'HR', isolationLevel: 'Encrypted Tenant Context', activeConflictsCount: 0, totalIngestedDocs: 0, rateLimitReqPerMin: 600, storageUsedGb: 0.1 },
+  { id: 'FINANCE', name: 'Finance, Tax & Audit Ops', code: 'FINANCE', isolationLevel: 'Hardware Isolated', activeConflictsCount: 0, totalIngestedDocs: 0, rateLimitReqPerMin: 600, storageUsedGb: 0.1 },
+  { id: 'LEGAL', name: 'Legal, Contracts & Compliance', code: 'LEGAL', isolationLevel: 'Encrypted Tenant Context', activeConflictsCount: 0, totalIngestedDocs: 0, rateLimitReqPerMin: 600, storageUsedGb: 0.1 },
+  { id: 'ENGINEERING', name: 'Engineering & Architecture', code: 'ENGINEERING', isolationLevel: 'Logical Namespace', activeConflictsCount: 0, totalIngestedDocs: 0, rateLimitReqPerMin: 1200, storageUsedGb: 0.1 }
+];
+
+const DEFAULT_TELEMETRY: SystemTelemetry = {
+  gatewayLatencyMs: 14.2,
+  rabbitMqRate: 0,
+  rabbitMqLatencyMs: 0,
+  pythonGpuLoad: 0,
+  llmCircuitBreakerStatus: 'CLOSED',
+  tokensPerSec: 0,
+  exactDuplicatesPruned: 0,
+  redisCacheHits: 0,
+  totalChunksProcessed: 0,
+  vectorRamSavedGb: 0,
+  llmCostSavedUsd: 0,
+  quarantinedPendingCount: 0,
+  quarantinedResolvedCount: 0,
+  processedTotal: 0
+};
 
 export interface ToastMessage {
   id: string;
@@ -173,21 +190,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [selectedTenant, setSelectedTenant] = useState<TenantScope>((initialAuth.user?.tenant as TenantScope) || 'HR');
   const [activeView, setActiveView] = useState<ActiveViewType>('quarantine');
-  const [tenants, setTenants] = useState<Tenant[]>(INITIAL_TENANTS);
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(INITIAL_AUDIT_LOGS);
-  const [ingestionQueue, setIngestionQueue] = useState<IngestionItem[]>(INITIAL_INGESTION_QUEUE);
-  const [conflicts, setConflicts] = useState<QuarantineConflict[]>(INITIAL_QUARANTINE_CONFLICTS);
-  const [selectedConflictId, setSelectedConflictId] = useState<string | null>('conf-8901');
-  const [clusters] = useState<DbscanCluster[]>(INITIAL_DBSCAN_CLUSTERS);
+  const [tenants, setTenants] = useState<Tenant[]>(DEFAULT_TENANTS);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [ingestionQueue, setIngestionQueue] = useState<IngestionItem[]>([]);
+  const [conflicts, setConflicts] = useState<QuarantineConflict[]>([]);
+  const [selectedConflictId, setSelectedConflictId] = useState<string | null>(null);
+  const [clusters, setClusters] = useState<DbscanCluster[]>([]);
   const [selectedClusterId, setSelectedClusterId] = useState<string | null>(null);
-  const [telemetry, setTelemetry] = useState<SystemTelemetry>(INITIAL_TELEMETRY);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+  const [telemetry, setTelemetry] = useState<SystemTelemetry>(DEFAULT_TELEMETRY);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [lineageModalConflictId, setLineageModalConflictId] = useState<string | null>(null);
 
   // Enterprise Audit Mode & Soft-Delete Store
   const [auditModeActive, setAuditModeActive] = useState<boolean>(false);
-  const [archivedChunks, setArchivedChunks] = useState<ChunkMetadata[]>(INITIAL_ARCHIVED_CHUNKS);
+  const [archivedChunks, setArchivedChunks] = useState<ChunkMetadata[]>([]);
 
   // Stage 2 State: Batch Ingestion Jobs & SSE Telemetry Logs
   const [batchJobs, setBatchJobs] = useState<BatchIngestionJob[]>([
@@ -570,58 +587,141 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     navigate('/dashboard');
   };
 
-  // Real telemetry and event updates driven via SSE EventSource
+  // Real telemetry and event updates driven via SSE EventSource with automatic reconnection
   useEffect(() => {
-    const userToken = user?.token;
+    const userToken = user?.token || token || sessionStorage.getItem('auth_token');
     if (!userToken || !user?.tenant) return;
 
-    const sseUrl = `${import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:8080/api/v1'}/telemetry/stream?token=${encodeURIComponent(userToken)}`;
     let eventSource: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let isSubscribed = true;
 
-    try {
-      eventSource = new EventSource(sseUrl);
+    const connectSSE = () => {
+      if (!isSubscribed) return;
+      try {
+        const sseUrl = `${import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:8080/api/v1'}/telemetry/stream?token=${encodeURIComponent(userToken)}`;
+        eventSource = new EventSource(sseUrl);
 
-      eventSource.addEventListener('INIT', (e) => {
-        console.info('[SSE] Handshake acknowledged:', e.data);
-      });
+        eventSource.addEventListener('INIT', (e) => {
+          console.info('[SSE] Handshake acknowledged:', e.data);
+        });
 
-      eventSource.addEventListener('TELEMETRY', (e) => {
-        try {
-          const payload = JSON.parse(e.data);
-          if (payload) {
-            setTelemetry(prev => ({
-              ...prev,
-              gatewayLatencyMs: payload.gatewayLatencyMs || prev.gatewayLatencyMs,
-              tokensPerSec: payload.tokensPerSec || prev.tokensPerSec,
-            }));
+        eventSource.addEventListener('TELEMETRY', (e) => {
+          try {
+            const payload = JSON.parse(e.data);
+            if (payload) {
+              setTelemetry(prev => ({
+                ...prev,
+                gatewayLatencyMs: payload.gatewayLatencyMs || prev.gatewayLatencyMs,
+                tokensPerSec: payload.tokensPerSec || prev.tokensPerSec,
+              }));
+            }
+          } catch (err) {
+            console.debug('[SSE] Telemetry parse err:', err);
           }
-        } catch (err) {
-          console.debug('[SSE] Telemetry parse err:', err);
+        });
+
+        eventSource.addEventListener('CONFLICT_RESOLVED', (e) => {
+          try {
+            const payload = JSON.parse(e.data);
+            addToast({
+              type: 'info',
+              title: 'Conflict Resolved Real-Time',
+              description: `Conflict ${payload.conflictId} resolved via ${payload.action}.`
+            });
+            setConflicts(prev => prev.map(c => c.id === payload.conflictId ? { ...c, status: payload.action } : c));
+          } catch (err) {}
+        });
+
+        eventSource.onerror = () => {
+          eventSource?.close();
+          if (isSubscribed) {
+            console.warn('[SSE] Connection lost. Reconnecting in 3s...');
+            reconnectTimer = setTimeout(connectSSE, 3000);
+          }
+        };
+      } catch (e) {
+        console.warn('SSE subscription error:', e);
+        if (isSubscribed) {
+          reconnectTimer = setTimeout(connectSSE, 5000);
         }
-      });
+      }
+    };
 
-      eventSource.addEventListener('CONFLICT_RESOLVED', (e) => {
-        try {
-          const payload = JSON.parse(e.data);
-          addToast({
-            type: 'info',
-            title: 'Conflict Resolved Real-Time',
-            description: `Conflict ${payload.conflictId} resolved via ${payload.action}.`
-          });
-        } catch (err) {}
-      });
+    connectSSE();
 
-      eventSource.onerror = () => {
-        eventSource?.close();
-      };
-    } catch (e) {
-      console.warn('SSE subscription error:', e);
+    // Fetch real telemetry stats from backend
+    fetch(`${import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:8080/api/v1'}/telemetry/stats`, {
+      headers: { Authorization: `Bearer ${userToken}` }
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(stats => {
+        if (stats) {
+          setTelemetry(prev => ({
+            ...prev,
+            quarantinedPendingCount: stats.pendingConflicts || 0,
+            exactDuplicatesPruned: stats.duplicatesPrunedTotal || 0,
+            circuitBreakerTriggerCount: stats.dlqTotal || 0,
+            gatewayLatencyMs: stats.lastExtractionLatencyMs || prev.gatewayLatencyMs
+          }));
+        }
+      })
+      .catch(err => console.debug('Could not fetch real telemetry stats:', err));
+
+    // Fetch real pending conflicts
+    fetchPendingConflicts(userToken)
+      .then(confList => {
+        if (confList && Array.isArray(confList)) {
+          setConflicts(confList);
+          if (confList.length > 0) {
+            setSelectedConflictId(confList[0].id);
+          }
+        }
+      })
+      .catch(err => console.debug('Could not fetch pending conflicts:', err));
+
+    // Fetch real audit logs
+    fetchAuditLogs(userToken)
+      .then(logs => {
+        if (logs && Array.isArray(logs)) {
+          setAuditLogs(logs);
+        }
+      })
+      .catch(err => console.debug('Could not fetch audit logs:', err));
+
+    // Fetch real clusters from Python AI Engine
+    if (user?.tenant) {
+      fetchClusters(user.tenant)
+        .then(res => {
+          if (res && res.clusters) {
+            const mappedClusters: DbscanCluster[] = res.clusters.map((c, i) => ({
+              id: `cluster-${c.clusterId}`,
+              name: c.label,
+              category: `${user.tenant} Policy Topic`,
+              coordX: c.points.length > 0 ? c.points[0].x * 50 : (i * 20 - 40),
+              coordY: c.points.length > 0 ? c.points[0].y * 50 : (i * 15 - 30),
+              radius: Math.max(15, Math.min(45, c.size * 5)),
+              sampleCount: c.size,
+              avgSimilarity: 0.88,
+              density: c.size > 10 ? 'High' : (c.size > 5 ? 'Medium' : 'Critical'),
+              description: `DBSCAN semantic topic group with ${c.size} related chunks.`,
+              conflictIds: c.points.map(p => p.id)
+            }));
+            setClusters(mappedClusters);
+            if (mappedClusters.length > 0) {
+              setSelectedClusterId(mappedClusters[0].id);
+            }
+          }
+        })
+        .catch(err => console.debug('Could not fetch clusters:', err));
     }
 
     return () => {
+      isSubscribed = false;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       eventSource?.close();
     };
-  }, [user?.token, user?.tenant]);
+  }, [user?.token, user?.tenant, token]);
 
   // Simulating ingestion pipeline progress
   useEffect(() => {
@@ -729,6 +829,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       exactDuplicatesPruned: (action === 'ACCEPTED_INCOMING' || action === 'PROMOTED_INCOMING_ARCHIVED_OLD') ? prev.exactDuplicatesPruned + 1 : prev.exactDuplicatesPruned,
       vectorRamSavedGb: Number((prev.vectorRamSavedGb + 0.012).toFixed(3))
     }));
+
+    // Real API call to Java Gateway
+    const activeToken = token || user?.token || sessionStorage.getItem('auth_token');
+    if (activeToken) {
+      let mappedAction = 'PROMOTED_INCOMING';
+      if (action === 'KEPT_EXISTING') mappedAction = 'KEEP_EXISTING';
+      else if (action === 'DISCARDED_BOTH') mappedAction = 'REJECT_INCOMING';
+      else if (action === 'MANUALLY_MERGED') mappedAction = 'MANUALLY_MERGED';
+
+      apiResolveConflict(conflictId, mappedAction, 'Resolved by Data Steward via console', mergedText, activeToken)
+        .catch(err => console.warn('Backend resolve conflict sync error:', err));
+    }
 
     if (action === 'PROMOTED_INCOMING_ARCHIVED_OLD' || action === 'ACCEPTED_INCOMING') {
       addToast({
