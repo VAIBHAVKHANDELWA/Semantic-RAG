@@ -11,6 +11,7 @@ import com.middleware.gateway.services.RabbitMqPublisherService;
 import com.middleware.gateway.services.StorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -38,6 +39,7 @@ public class IngestionController {
     private final DocumentParserService documentParserService;
     private final IngestionJobRepository ingestionJobRepository;
     private final RabbitMqPublisherService rabbitMqPublisherService;
+    private final StringRedisTemplate redisTemplate;
 
     /**
      * Endpoint 1: GET /api/v1/ingest/upload-ticket?fileName=...
@@ -106,6 +108,19 @@ public class IngestionController {
 
         // Publish to RabbitMQ raw-document-queue
         rabbitMqPublisherService.publishIngestionJob(jobId, tenantId, request.getObjectKey());
+
+        // Invalidate tenant Redis query cache so subsequent queries reflect incoming ingestion changes
+        try {
+            if (redisTemplate != null) {
+                java.util.Set<String> queryKeys = redisTemplate.keys("rag:query:" + tenantId + ":*");
+                if (queryKeys != null && !queryKeys.isEmpty()) {
+                    redisTemplate.delete(queryKeys);
+                    log.info("Invalidated {} cached query entries for Tenant [{}] on ingest complete", queryKeys.size(), tenantId);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to invalidate query cache for Tenant [{}]: {}", tenantId, e.getMessage());
+        }
 
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "jobId", jobId,

@@ -69,6 +69,9 @@ public class TelemetryController {
         String quarantinedStr = redisTemplate.opsForValue().get("metrics:quarantined_total");
         String dlqStr = redisTemplate.opsForValue().get("metrics:dlq_total");
         String latencyStr = redisTemplate.opsForValue().get("metrics:last_extraction_latency_ms");
+        String queryHitsStr = redisTemplate.opsForValue().get("metrics:query:cache_hits");
+        String queryMissesStr = redisTemplate.opsForValue().get("metrics:query:cache_misses");
+        String queryTotalStr = redisTemplate.opsForValue().get("metrics:query:total");
 
         Map<String, Object> stats = new HashMap<>();
         stats.put("tenantId", tenantId);
@@ -80,6 +83,9 @@ public class TelemetryController {
         stats.put("quarantinedTotal", quarantinedStr != null ? Long.parseLong(quarantinedStr) : 0L);
         stats.put("dlqTotal", dlqStr != null ? Long.parseLong(dlqStr) : 0L);
         stats.put("lastExtractionLatencyMs", latencyStr != null ? Double.parseDouble(latencyStr) : 0.0);
+        stats.put("queryCacheHits", queryHitsStr != null ? Long.parseLong(queryHitsStr) : 0L);
+        stats.put("queryCacheMisses", queryMissesStr != null ? Long.parseLong(queryMissesStr) : 0L);
+        stats.put("queryTotal", queryTotalStr != null ? Long.parseLong(queryTotalStr) : 0L);
 
         return ResponseEntity.ok(stats);
     }

@@ -249,11 +249,13 @@ class RabbitMQWorker:
                 f"({committed_count} Committed, {quarantine_count} Quarantined)."
             )
 
-            # Record processed metrics in Redis
+            # Record processed metrics in Redis and invalidate query cache if new chunks committed
             if db_service.redis_client:
                 try:
                     db_service.redis_client.incr("metrics:processed_total")
                     db_service.redis_client.incr(f"metrics:processed:{tenant_id}")
+                    if committed_count > 0:
+                        db_service.invalidate_tenant_query_cache(tenant_id)
                 except Exception:
                     pass
 

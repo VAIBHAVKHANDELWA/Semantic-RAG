@@ -191,6 +191,9 @@ public class GovernanceService {
 
     @Transactional(readOnly = true)
     public List<ProvenanceEdge> getProvenanceEdges(String conflictId, String tenantId) {
+        if ("GLOBAL".equalsIgnoreCase(tenantId) || "ALL".equalsIgnoreCase(tenantId)) {
+            return provenanceRepository.findByCreatedByConflictId(conflictId);
+        }
         return provenanceRepository.findByTenantIdAndCreatedByConflictId(tenantId, conflictId);
     }
 

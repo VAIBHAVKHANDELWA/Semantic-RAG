@@ -126,8 +126,13 @@ public class GovernanceController {
     private String extractTenant(Authentication authentication) {
         if (authentication != null && authentication.getPrincipal() instanceof UserPrincipal principal) {
             String tenant = principal.getTenant();
-            if (tenant != null && !tenant.trim().isEmpty() && !"GLOBAL".equalsIgnoreCase(tenant) && !"ALL".equalsIgnoreCase(tenant)) {
-                return tenant.trim().toUpperCase();
+            if (tenant != null && !tenant.trim().isEmpty()) {
+                if ("SYSTEM_ADMIN".equalsIgnoreCase(principal.getRole())) {
+                    return tenant.trim().toUpperCase();
+                }
+                if (!"GLOBAL".equalsIgnoreCase(tenant) && !"ALL".equalsIgnoreCase(tenant)) {
+                    return tenant.trim().toUpperCase();
+                }
             }
         }
         throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access Denied: Missing or invalid tenant in JWT token");

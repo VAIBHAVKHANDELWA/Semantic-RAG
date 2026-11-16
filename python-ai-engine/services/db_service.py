@@ -39,6 +39,24 @@ class DatabaseService:
             self.redis_client = None
             self._local_dedup = set()
 
+    def invalidate_tenant_query_cache(self, tenant_id: str) -> int:
+        """
+        Invalidates all cached RAG query responses for a given tenant in Redis.
+        Called automatically upon document ingestion or state changes.
+        """
+        if not self.redis_client:
+            return 0
+        try:
+            pattern = f"rag:query:{tenant_id.strip().upper()}:*"
+            keys = self.redis_client.keys(pattern)
+            if keys:
+                self.redis_client.delete(*keys)
+                logger.info(f"Invalidated {len(keys)} cached query entries for Tenant [{tenant_id}].")
+                return len(keys)
+        except Exception as e:
+            logger.warning(f"Query cache invalidation error: {e}")
+        return 0
+
     def get_connection(self):
         conn = psycopg2.connect(self.db_url)
         register_vector(conn)

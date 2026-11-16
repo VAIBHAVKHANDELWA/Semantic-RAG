@@ -237,7 +237,37 @@ python tests/test_auth_governance.py
 
 ---
 
-### 9. Troubleshooting & Diagnostics
+### 10. DBSCAN Clustering & Semantic Query Cache Operations
+
+#### Unsupervised DBSCAN Topic Clustering
+Quarantined chunk embeddings are grouped into density-based topic clusters via `POST /api/v1/clusters` and `GET /api/v1/clusters`.
+The clustering parameters are configurable via environment variables, request body parameters, or URL query parameters:
+
+| Parameter | Environment Variable | Default | Valid Range | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `eps` | `DBSCAN_EPS` | `0.15` | `0.01` - `2.0` | Maximum cosine distance between two samples for one to be considered in the neighborhood of the other. |
+| `min_samples` | `DBSCAN_MIN_SAMPLES` | `12` | `1` - `1000` | The number of samples in a neighborhood for a point to be considered a core point. Points below this threshold are labeled as noise (-1). |
+
+**Input Range Validation:**
+Calls passing an `eps` outside `(0.0, 2.0]` or `min_samples < 1` return an immediate `400 Bad Request`.
+
+#### RAG Query Retrieval & Semantic Redis Cache
+Repeated enterprise search queries are accelerated by an in-memory Redis cache with configurable TTL:
+
+| Parameter | Environment Variable | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `QUERY_CACHE_TTL` | `QUERY_CACHE_TTL` | `3600` (1 hr) | Expiration TTL in seconds for cached dense retrieval query responses. |
+
+- **Cache Key Schema:** `rag:query:{tenant}:{sha256(normalized_query)}`
+- **Automatic Invalidation:** Whenever new document chunks are ingested and committed to the tenant index (via `queue_worker.py` or `/api/v1/ingest/complete`), all cached queries for that tenant are invalidated automatically.
+- **Explicit Invalidation Endpoint:** `POST /api/v1/query/invalidate?tenantId={tenant}`
+- **Telemetry Counters:**
+  - `metrics:query:cache_hits`: Incremented on each Redis cache hit.
+  - `metrics:query:cache_misses`: Incremented on each vector DB fallback calculation.
+  - `metrics:query:total`: Total search requests received.
+---
+
+### 11. Troubleshooting & Diagnostics
 
 - **RabbitMQ Queue Backlog:** Inspect queue status at `http://localhost:15672` (Queue: `raw-document-queue`). If messages are accumulating, verify that Python worker `queue_worker.py` is running.
 - **MinIO Connection Errors:** Ensure the bucket `semantic-rag-uploads` exists and that CORS allows `PUT` from origin `http://localhost:5173`.
@@ -245,4 +275,5 @@ python tests/test_auth_governance.py
   ```sql
   SELECT extname, extversion FROM pg_extension WHERE extname = 'vector';
   ```
+
 

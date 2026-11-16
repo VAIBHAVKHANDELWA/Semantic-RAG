@@ -20,18 +20,34 @@ import type {
   SseTelemetryPayload,
   ChunkMetadata
 } from '../types';
-import { 
-  INITIAL_TENANTS, 
-  INITIAL_INGESTION_QUEUE, 
-  INITIAL_QUARANTINE_CONFLICTS, 
-  INITIAL_DBSCAN_CLUSTERS, 
-  INITIAL_TELEMETRY, 
-  INITIAL_NOTIFICATIONS,
-  INITIAL_AUDIT_LOGS,
-  INITIAL_ARCHIVED_CHUNKS
-} from '../data/mockData';
 import { loginApi, logoutApi } from '../api/client';
-import { resolveConflict as apiResolveConflict } from '../api/quarantine';
+import { fetchPendingConflicts, resolveConflict as apiResolveConflict } from '../api/quarantine';
+import { fetchAuditLogs } from '../api/audit';
+import { fetchClusters } from '../api/clusters';
+
+const DEFAULT_TENANTS: Tenant[] = [
+  { id: 'HR', name: 'Human Resources & People Ops', code: 'HR', isolationLevel: 'Encrypted Tenant Context', activeConflictsCount: 0, totalIngestedDocs: 0, rateLimitReqPerMin: 600, storageUsedGb: 0.1 },
+  { id: 'FINANCE', name: 'Finance, Tax & Audit Ops', code: 'FINANCE', isolationLevel: 'Hardware Isolated', activeConflictsCount: 0, totalIngestedDocs: 0, rateLimitReqPerMin: 600, storageUsedGb: 0.1 },
+  { id: 'LEGAL', name: 'Legal, Contracts & Compliance', code: 'LEGAL', isolationLevel: 'Encrypted Tenant Context', activeConflictsCount: 0, totalIngestedDocs: 0, rateLimitReqPerMin: 600, storageUsedGb: 0.1 },
+  { id: 'ENGINEERING', name: 'Engineering & Architecture', code: 'ENGINEERING', isolationLevel: 'Logical Namespace', activeConflictsCount: 0, totalIngestedDocs: 0, rateLimitReqPerMin: 1200, storageUsedGb: 0.1 }
+];
+
+const DEFAULT_TELEMETRY: SystemTelemetry = {
+  gatewayLatencyMs: 14.2,
+  rabbitMqRate: 0,
+  rabbitMqLatencyMs: 0,
+  pythonGpuLoad: 0,
+  llmCircuitBreakerStatus: 'CLOSED',
+  tokensPerSec: 0,
+  exactDuplicatesPruned: 0,
+  redisCacheHits: 0,
+  totalChunksProcessed: 0,
+  vectorRamSavedGb: 0,
+  llmCostSavedUsd: 0,
+  quarantinedPendingCount: 0,
+  quarantinedResolvedCount: 0,
+  processedTotal: 0
+};
 
 export interface ToastMessage {
   id: string;
@@ -174,21 +190,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [selectedTenant, setSelectedTenant] = useState<TenantScope>((initialAuth.user?.tenant as TenantScope) || 'HR');
   const [activeView, setActiveView] = useState<ActiveViewType>('quarantine');
-  const [tenants, setTenants] = useState<Tenant[]>(INITIAL_TENANTS);
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(INITIAL_AUDIT_LOGS);
-  const [ingestionQueue, setIngestionQueue] = useState<IngestionItem[]>(INITIAL_INGESTION_QUEUE);
-  const [conflicts, setConflicts] = useState<QuarantineConflict[]>(INITIAL_QUARANTINE_CONFLICTS);
-  const [selectedConflictId, setSelectedConflictId] = useState<string | null>('conf-8901');
-  const [clusters] = useState<DbscanCluster[]>(INITIAL_DBSCAN_CLUSTERS);
+  const [tenants, setTenants] = useState<Tenant[]>(DEFAULT_TENANTS);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [ingestionQueue, setIngestionQueue] = useState<IngestionItem[]>([]);
+  const [conflicts, setConflicts] = useState<QuarantineConflict[]>([]);
+  const [selectedConflictId, setSelectedConflictId] = useState<string | null>(null);
+  const [clusters, setClusters] = useState<DbscanCluster[]>([]);
   const [selectedClusterId, setSelectedClusterId] = useState<string | null>(null);
-  const [telemetry, setTelemetry] = useState<SystemTelemetry>(INITIAL_TELEMETRY);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+  const [telemetry, setTelemetry] = useState<SystemTelemetry>(DEFAULT_TELEMETRY);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [lineageModalConflictId, setLineageModalConflictId] = useState<string | null>(null);
 
   // Enterprise Audit Mode & Soft-Delete Store
   const [auditModeActive, setAuditModeActive] = useState<boolean>(false);
-  const [archivedChunks, setArchivedChunks] = useState<ChunkMetadata[]>(INITIAL_ARCHIVED_CHUNKS);
+  const [archivedChunks, setArchivedChunks] = useState<ChunkMetadata[]>([]);
 
   // Stage 2 State: Batch Ingestion Jobs & SSE Telemetry Logs
   const [batchJobs, setBatchJobs] = useState<BatchIngestionJob[]>([
@@ -651,6 +667,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       })
       .catch(err => console.debug('Could not fetch real telemetry stats:', err));
+
+    // Fetch real pending conflicts
+    fetchPendingConflicts(userToken)
+      .then(confList => {
+        if (confList && Array.isArray(confList)) {
+          setConflicts(confList);
+          if (confList.length > 0) {
+            setSelectedConflictId(confList[0].id);
+          }
+        }
+      })
+      .catch(err => console.debug('Could not fetch pending conflicts:', err));
+
+    // Fetch real audit logs
+    fetchAuditLogs(userToken)
+      .then(logs => {
+        if (logs && Array.isArray(logs)) {
+          setAuditLogs(logs);
+        }
+      })
+      .catch(err => console.debug('Could not fetch audit logs:', err));
+
+    // Fetch real clusters from Python AI Engine
+    if (user?.tenant) {
+      fetchClusters(user.tenant)
+        .then(res => {
+          if (res && res.clusters) {
+            const mappedClusters: DbscanCluster[] = res.clusters.map((c, i) => ({
+              id: `cluster-${c.clusterId}`,
+              name: c.label,
+              category: `${user.tenant} Policy Topic`,
+              coordX: c.points.length > 0 ? c.points[0].x * 50 : (i * 20 - 40),
+              coordY: c.points.length > 0 ? c.points[0].y * 50 : (i * 15 - 30),
+              radius: Math.max(15, Math.min(45, c.size * 5)),
+              sampleCount: c.size,
+              avgSimilarity: 0.88,
+              density: c.size > 10 ? 'High' : (c.size > 5 ? 'Medium' : 'Critical'),
+              description: `DBSCAN semantic topic group with ${c.size} related chunks.`,
+              conflictIds: c.points.map(p => p.id)
+            }));
+            setClusters(mappedClusters);
+            if (mappedClusters.length > 0) {
+              setSelectedClusterId(mappedClusters[0].id);
+            }
+          }
+        })
+        .catch(err => console.debug('Could not fetch clusters:', err));
+    }
 
     return () => {
       isSubscribed = false;

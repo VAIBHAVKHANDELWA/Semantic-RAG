@@ -169,6 +169,10 @@ class ConflictAdjudicationService:
             "verdict_type": verdict,
             "confidence": confidence,
             "explanation": explanation,
+            "evidence": {
+                "incoming_passage": incoming_text[:350].strip(),
+                "existing_passage": existing_text[:350].strip()
+            },
             "rule_features": features
         }
 
