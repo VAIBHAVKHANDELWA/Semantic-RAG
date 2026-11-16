@@ -10,10 +10,11 @@ export const fetchConflictDetail = (id: string, token?: string | null): Promise<
 export const resolveConflict = (
   id: string,
   action: string,
+  reason: string = 'Steward resolution verified',
   mergedText?: string,
   token?: string | null
 ): Promise<QuarantineConflict> =>
   apiRequest<QuarantineConflict>(`/quarantine/${id}/resolve`, {
     method: 'POST',
-    body: JSON.stringify({ action, mergedText }),
+    body: JSON.stringify({ action, reason, mergedText }),
   }, token || localStorage.getItem('auth_token'));

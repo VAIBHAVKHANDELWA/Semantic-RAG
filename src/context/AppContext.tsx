@@ -31,6 +31,7 @@ import {
   INITIAL_ARCHIVED_CHUNKS
 } from '../data/mockData';
 import { loginApi, logoutApi } from '../api/client';
+import { resolveConflict as apiResolveConflict } from '../api/quarantine';
 
 export interface ToastMessage {
   id: string;
@@ -570,58 +571,93 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     navigate('/dashboard');
   };
 
-  // Real telemetry and event updates driven via SSE EventSource
+  // Real telemetry and event updates driven via SSE EventSource with automatic reconnection
   useEffect(() => {
-    const userToken = user?.token;
+    const userToken = user?.token || token || sessionStorage.getItem('auth_token');
     if (!userToken || !user?.tenant) return;
 
-    const sseUrl = `${import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:8080/api/v1'}/telemetry/stream?token=${encodeURIComponent(userToken)}`;
     let eventSource: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let isSubscribed = true;
 
-    try {
-      eventSource = new EventSource(sseUrl);
+    const connectSSE = () => {
+      if (!isSubscribed) return;
+      try {
+        const sseUrl = `${import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:8080/api/v1'}/telemetry/stream?token=${encodeURIComponent(userToken)}`;
+        eventSource = new EventSource(sseUrl);
 
-      eventSource.addEventListener('INIT', (e) => {
-        console.info('[SSE] Handshake acknowledged:', e.data);
-      });
+        eventSource.addEventListener('INIT', (e) => {
+          console.info('[SSE] Handshake acknowledged:', e.data);
+        });
 
-      eventSource.addEventListener('TELEMETRY', (e) => {
-        try {
-          const payload = JSON.parse(e.data);
-          if (payload) {
-            setTelemetry(prev => ({
-              ...prev,
-              gatewayLatencyMs: payload.gatewayLatencyMs || prev.gatewayLatencyMs,
-              tokensPerSec: payload.tokensPerSec || prev.tokensPerSec,
-            }));
+        eventSource.addEventListener('TELEMETRY', (e) => {
+          try {
+            const payload = JSON.parse(e.data);
+            if (payload) {
+              setTelemetry(prev => ({
+                ...prev,
+                gatewayLatencyMs: payload.gatewayLatencyMs || prev.gatewayLatencyMs,
+                tokensPerSec: payload.tokensPerSec || prev.tokensPerSec,
+              }));
+            }
+          } catch (err) {
+            console.debug('[SSE] Telemetry parse err:', err);
           }
-        } catch (err) {
-          console.debug('[SSE] Telemetry parse err:', err);
+        });
+
+        eventSource.addEventListener('CONFLICT_RESOLVED', (e) => {
+          try {
+            const payload = JSON.parse(e.data);
+            addToast({
+              type: 'info',
+              title: 'Conflict Resolved Real-Time',
+              description: `Conflict ${payload.conflictId} resolved via ${payload.action}.`
+            });
+            setConflicts(prev => prev.map(c => c.id === payload.conflictId ? { ...c, status: payload.action } : c));
+          } catch (err) {}
+        });
+
+        eventSource.onerror = () => {
+          eventSource?.close();
+          if (isSubscribed) {
+            console.warn('[SSE] Connection lost. Reconnecting in 3s...');
+            reconnectTimer = setTimeout(connectSSE, 3000);
+          }
+        };
+      } catch (e) {
+        console.warn('SSE subscription error:', e);
+        if (isSubscribed) {
+          reconnectTimer = setTimeout(connectSSE, 5000);
         }
-      });
+      }
+    };
 
-      eventSource.addEventListener('CONFLICT_RESOLVED', (e) => {
-        try {
-          const payload = JSON.parse(e.data);
-          addToast({
-            type: 'info',
-            title: 'Conflict Resolved Real-Time',
-            description: `Conflict ${payload.conflictId} resolved via ${payload.action}.`
-          });
-        } catch (err) {}
-      });
+    connectSSE();
 
-      eventSource.onerror = () => {
-        eventSource?.close();
-      };
-    } catch (e) {
-      console.warn('SSE subscription error:', e);
-    }
+    // Fetch real telemetry stats from backend
+    fetch(`${import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:8080/api/v1'}/telemetry/stats`, {
+      headers: { Authorization: `Bearer ${userToken}` }
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(stats => {
+        if (stats) {
+          setTelemetry(prev => ({
+            ...prev,
+            quarantinedPendingCount: stats.pendingConflicts || 0,
+            exactDuplicatesPruned: stats.duplicatesPrunedTotal || 0,
+            circuitBreakerTriggerCount: stats.dlqTotal || 0,
+            gatewayLatencyMs: stats.lastExtractionLatencyMs || prev.gatewayLatencyMs
+          }));
+        }
+      })
+      .catch(err => console.debug('Could not fetch real telemetry stats:', err));
 
     return () => {
+      isSubscribed = false;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       eventSource?.close();
     };
-  }, [user?.token, user?.tenant]);
+  }, [user?.token, user?.tenant, token]);
 
   // Simulating ingestion pipeline progress
   useEffect(() => {
@@ -729,6 +765,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       exactDuplicatesPruned: (action === 'ACCEPTED_INCOMING' || action === 'PROMOTED_INCOMING_ARCHIVED_OLD') ? prev.exactDuplicatesPruned + 1 : prev.exactDuplicatesPruned,
       vectorRamSavedGb: Number((prev.vectorRamSavedGb + 0.012).toFixed(3))
     }));
+
+    // Real API call to Java Gateway
+    const activeToken = token || user?.token || sessionStorage.getItem('auth_token');
+    if (activeToken) {
+      let mappedAction = 'PROMOTED_INCOMING';
+      if (action === 'KEPT_EXISTING') mappedAction = 'KEEP_EXISTING';
+      else if (action === 'DISCARDED_BOTH') mappedAction = 'REJECT_INCOMING';
+      else if (action === 'MANUALLY_MERGED') mappedAction = 'MANUALLY_MERGED';
+
+      apiResolveConflict(conflictId, mappedAction, 'Resolved by Data Steward via console', mergedText, activeToken)
+        .catch(err => console.warn('Backend resolve conflict sync error:', err));
+    }
 
     if (action === 'PROMOTED_INCOMING_ARCHIVED_OLD' || action === 'ACCEPTED_INCOMING') {
       addToast({

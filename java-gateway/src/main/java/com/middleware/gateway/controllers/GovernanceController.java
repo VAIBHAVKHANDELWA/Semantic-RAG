@@ -71,12 +71,17 @@ public class GovernanceController {
         String actorId = extractUserId(authentication);
         String actorRole = extractRole(authentication);
 
+        if (request.getReason() == null || request.getReason().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Resolution reason is required and cannot be empty");
+        }
+
         QuarantineConflict resolved = governanceService.resolveConflict(
                 id,
                 tenantId,
                 actorId,
                 actorRole,
                 request.getAction(),
+                request.getReason(),
                 request.getMergedText()
         );
         return ResponseEntity.ok(resolved);
