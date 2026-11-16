@@ -41,8 +41,28 @@ public class User {
     @Builder.Default
     private Boolean active = true;
 
+    @Column(name = "must_change_password", nullable = false)
+    @Builder.Default
+    private Boolean mustChangePassword = true;
+
+    @Column(name = "failed_login_attempts", nullable = false)
+    @Builder.Default
+    private Integer failedLoginAttempts = 0;
+
+    @Column(name = "locked_until")
+    private OffsetDateTime lockedUntil;
+
+    @Column(name = "last_login_at")
+    private OffsetDateTime lastLoginAt;
+
+    @Column(name = "created_by")
+    private String createdBy;
+
+    @Column(name = "is_super_admin", nullable = false)
+    @Builder.Default
+    private Boolean isSuperAdmin = false;
+
     @Column(name = "created_at")
     @Builder.Default
     private OffsetDateTime createdAt = OffsetDateTime.now();
 }
-
