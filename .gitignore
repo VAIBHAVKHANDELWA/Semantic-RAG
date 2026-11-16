@@ -70,7 +70,8 @@ hs_err_pid*
 coverage/
 .nyc_output/
 *.docx
-test_*.py
+/test_*.py
+!tests/**
 build_full_report.py
 docx_engine_core.py
 
