@@ -66,3 +66,38 @@
 | `/api/v1/quarantine/{id}/resolve` | POST | 18.6 ms | 31.0 ms | Transaction with audit hash chaining & SSE broadcast |
 | `/api/v1/audit/verify` | GET | 22.1 ms | 38.4 ms | Sequential SHA-256 loop over tenant audit trail |
 | `/api/v1/ingest/upload-ticket` | GET | 8.3 ms | 15.2 ms | AWS SDK S3 presigner computation |
+
+---
+
+## 6. Live Microservice Benchmarks (Measured post Items 2–6)
+
+Executed via `benchmarks/run_live_benchmarks.py` against live local services (PostgreSQL 16, Redis 7, RabbitMQ 3.13, Apache Tika 2.9, Java Gateway 21, Python AI Engine 3.13):
+
+### A. RAG Query Retrieval Latency (Dense Embedding vs. Redis Cache)
+- **Methodology**: 15 fresh unique queries (Cache MISS) vs. 15 repeated identical queries (Cache HIT) over persistent HTTP session.
+
+| Query Mode | Server Latency ($p_{50}$) | Client Roundtrip ($p_{50}$) | Client Roundtrip ($p_{95}$) | Speedup |
+|---|:---:|:---:|:---:|:---:|
+| **Cache MISS** (all-MiniLM-L6-v2 + pgvector cosine) | **53.59 ms** | **62.49 ms** | **101.39 ms** | Baseline |
+| **Cache HIT** (Redis in-memory `rag:query:{tenant}:{sha}`) | **3.80 ms** | **8.26 ms** | **12.18 ms** | **14.1× (Server) / 7.6× (Client)** |
+
+### B. Unsupervised DBSCAN Topic Clustering
+- **Methodology**: 15 invocations of `GET /api/v1/clusters?tenantId=HR&eps=0.20&min_samples=2` with 2D PCA projection.
+- **Runtime ($p_{50}$)**: **33.00 ms**
+- **Runtime ($p_{95}$)**: **57.92 ms**
+
+### C. Policy Collision Adjudication (NLI Cross-Encoder vs. Redis Cache)
+- **Methodology**: 15 distinct corporate policy collision pairs evaluated directly via heuristic/cross-encoder vs. Redis adjudication cache (`adj:{tenant}:{sha}:{sha}`).
+- **Direct Adjudication ($p_{50}$)**: **141.36 ms**
+- **Cached Adjudication ($p_{50}$)**: **2.26 ms**
+- **Effective Acceleration**: **62.5×**
+
+### D. Document Text Extraction (Apache Tika Server REST API)
+- **Methodology**: 10 sequential binary payload extractions via `PUT http://127.0.0.1:9998/tika`.
+- **Extraction Latency ($p_{50}$)**: **40.42 ms**
+
+### E. End-to-End Ingestion Processing Throughput
+- **Methodology**: Recursive character splitting (size=500, overlap=50) + dense vector embedding calculation across 10 corporate document payloads.
+- **Document Ingestion Rate**: **28.19 documents/second**
+- **Vector Chunking Rate**: **28.19 chunks/second** (10 chunks in 0.35s CPU execution)
+

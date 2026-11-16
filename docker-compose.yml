@@ -8,7 +8,7 @@
     environment:
       POSTGRES_DB: semantic_rag_db
       POSTGRES_USER: admin
-      POSTGRES_PASSWORD: adminpassword
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-adminpassword}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d semantic_rag_db"]
       interval: 5s
@@ -26,7 +26,7 @@
       - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: admin
-      RABBITMQ_DEFAULT_PASS: adminpassword
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-adminpassword}
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "check_running"]
       interval: 10s
