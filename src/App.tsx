@@ -10,6 +10,7 @@ import { AuthPage } from './components/auth/AuthPage';
 import { OnboardingPage } from './components/auth/OnboardingPage';
 import { Unauthorized403 } from './components/auth/Unauthorized403';
 import { RoleGuard } from './components/auth/RoleGuard';
+import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeModal';
 
 const MainDashboardLayout: React.FC = () => {
   return (
@@ -29,6 +30,7 @@ const MainDashboardLayout: React.FC = () => {
       {/* Global Notifications & Modals */}
       <ToastContainer />
       <LineageGraphModal />
+      <ForcePasswordChangeModal />
     </div>
   );
 };
@@ -51,12 +53,11 @@ const RouterView: React.FC = () => {
           <ToastContainer />
         </>
       );
-    case '/signup':
+    case '/admin/users':
       return (
-        <>
-          <AuthPage initialMode="signup" />
-          <ToastContainer />
-        </>
+        <RoleGuard allowedRoles={['SYSTEM_ADMIN']}>
+          <MainDashboardLayout />
+        </RoleGuard>
       );
     case '/onboarding':
       return (
@@ -104,6 +105,7 @@ export function App() {
   return (
     <AppProvider>
       <RouterView />
+      <ForcePasswordChangeModal />
     </AppProvider>
   );
 }

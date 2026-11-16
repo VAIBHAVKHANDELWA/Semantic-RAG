@@ -13,6 +13,8 @@ export interface User {
   token: string;
   email?: string;
   avatarUrl?: string;
+  mustChangePassword?: boolean;
+  isSuperAdmin?: boolean;
 }
 
 export type UserProfile = User;
@@ -20,9 +22,9 @@ export type UserProfile = User;
 export type AppRoute = 
   | '/' 
   | '/login' 
-  | '/signup' 
   | '/onboarding' 
   | '/dashboard' 
+  | '/admin/users'
   | '/admin/billing' 
   | '/admin/tenants' 
   | '/admin/logs' 
@@ -38,7 +40,8 @@ export type ActiveViewType =
   | 'billing' 
   | 'tenant_mgmt' 
   | 'system_logs' 
-  | 'audit_logs';
+  | 'audit_logs'
+  | 'user_mgmt';
 
 export interface WorkspaceConfig {
   workspaceName: string;

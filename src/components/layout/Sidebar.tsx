@@ -14,7 +14,8 @@ import {
   FileCheck,
   Activity,
   UserCheck,
-  Brain
+  Brain,
+  Users
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -74,6 +75,11 @@ export const Sidebar: React.FC = () => {
             id: 'analytics',
             label: 'Global Health & Metrics',
             icon: Activity
+          },
+          {
+            id: 'user_mgmt',
+            label: 'User Governance',
+            icon: Users
           },
           {
             id: 'billing',

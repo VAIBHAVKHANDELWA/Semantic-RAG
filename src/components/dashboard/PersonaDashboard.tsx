@@ -35,6 +35,7 @@ import { DbscanClusterChart } from '../analytics/DbscanClusterChart';
 import { BillingDashboard } from '../admin/BillingDashboard';
 import { TenantManagementView } from '../admin/TenantManagementView';
 import { SystemLogsView } from '../admin/SystemLogsView';
+import { UserManagementView } from '../admin/UserManagementView';
 import { ComplianceAuditLogsView } from '../audit/ComplianceAuditLogsView';
 import { ArchivedChunksView } from '../audit/ArchivedChunksView';
 import { AiPipelineVisualizer } from '../pipeline/AiPipelineVisualizer';
@@ -76,6 +77,10 @@ export const PersonaDashboard: React.FC = () => {
   };
 
   // Specific Active View Routing Overrides
+  if (activeView === 'user_mgmt') {
+    return <UserManagementView />;
+  }
+
   if (activeView === 'billing') {
     return <BillingDashboard />;
   }

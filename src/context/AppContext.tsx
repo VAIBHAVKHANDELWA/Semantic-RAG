@@ -30,7 +30,7 @@ import {
   INITIAL_AUDIT_LOGS,
   INITIAL_ARCHIVED_CHUNKS
 } from '../data/mockData';
-import { loginApi, IS_DEMO_MODE } from '../api/client';
+import { loginApi, logoutApi } from '../api/client';
 
 export interface ToastMessage {
   id: string;
@@ -49,6 +49,7 @@ interface AppContextType {
   isAuthenticated: boolean;
   token: string | null;
   loginWithCredentials: (email: string, password: string) => Promise<void>;
+  updateUserPassword: (newToken: string) => void;
   loginAsDataSteward: () => void;
   loginAsSystemAdmin: () => void;
   loginAsAuditor: () => void;
@@ -131,17 +132,30 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// Initial Default User Profile (Data Steward HR)
-const DEFAULT_USER: User = {
-  id: 'usr-steward-101',
-  name: 'Sarah Jenkins',
-  tenant: 'HR',
-  department: 'HR',
-  role: 'DATA_STEWARD',
-  token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3ItMTAxIiwicm9sZSI6IkRBVEFfU1RFV0FSRCIsInRlbmFudCI6IkhSIiwiaWF0IjoxNTE2MjM5MDIyfQ.signature',
-  email: 'sarah.jenkins@enterprise.ai',
-  avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-};
+// ARCHITECTURAL EXPLANATION: sessionStorage vs localStorage for Enterprise JWT:
+// 1. Tab-Level Isolation: sessionStorage is strictly scoped to the active browser tab.
+//    Opening another tab or tenant context will not accidentally leak or overwrite this token.
+// 2. Ephemeral Lifetime: The token is automatically deleted when the user closes the tab,
+//    preventing persistent session hijack or token extraction from stagnant browser storage.
+// 3. Tab Refresh Continuity: Survives user page reloads (F5) within the same active tab,
+//    preventing disruptive mid-workflow logouts.
+// 4. In-Memory React State: Paired with useState for zero-latency UI reactivity across components.
+function getInitialAuth(): { token: string | null; user: User | null } {
+  if (typeof window === 'undefined') return { token: null, user: null };
+  try {
+    const storedToken = sessionStorage.getItem('auth_token');
+    const storedUserJson = sessionStorage.getItem('auth_user');
+    if (storedToken && storedUserJson) {
+      const parsedUser = JSON.parse(storedUserJson);
+      return { token: storedToken, user: parsedUser };
+    }
+  } catch (err) {
+    console.error('Failed to parse cached auth session', err);
+    sessionStorage.removeItem('auth_token');
+    sessionStorage.removeItem('auth_user');
+  }
+  return { token: null, user: null };
+}
 
 const DEFAULT_WORKSPACE: WorkspaceConfig = {
   workspaceName: 'Enterprise Semantic RAG Guard',
@@ -150,12 +164,14 @@ const DEFAULT_WORKSPACE: WorkspaceConfig = {
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentRoute, setCurrentRoute] = useState<AppRoute>('/dashboard');
-  const [user, setUser] = useState<User | null>(DEFAULT_USER);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
+  const initialAuth = getInitialAuth();
+  const [currentRoute, setCurrentRoute] = useState<AppRoute>(initialAuth.user ? '/dashboard' : '/login');
+  const [user, setUser] = useState<User | null>(initialAuth.user);
+  const [token, setToken] = useState<string | null>(initialAuth.token);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!initialAuth.user);
   const [workspaceConfig, setWorkspaceConfig] = useState<WorkspaceConfig>(DEFAULT_WORKSPACE);
 
-  const [selectedTenant, setSelectedTenant] = useState<TenantScope>('HR');
+  const [selectedTenant, setSelectedTenant] = useState<TenantScope>((initialAuth.user?.tenant as TenantScope) || 'HR');
   const [activeView, setActiveView] = useState<ActiveViewType>('quarantine');
   const [tenants, setTenants] = useState<Tenant[]>(INITIAL_TENANTS);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(INITIAL_AUDIT_LOGS);
@@ -445,13 +461,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         tenant: res.user.tenant,
         department: res.user.tenant,
         token: res.token,
+        mustChangePassword: res.mustChangePassword,
+        isSuperAdmin: res.user.isSuperAdmin,
         avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${res.user.email}`
       };
       setUser(newUser);
+      setToken(res.token);
       setIsAuthenticated(true);
       setSelectedTenant(res.user.tenant as TenantScope);
-      localStorage.setItem('auth_token', res.token);
-      localStorage.setItem('auth_user', JSON.stringify(newUser));
+      sessionStorage.setItem('auth_token', res.token);
+      sessionStorage.setItem('auth_user', JSON.stringify(newUser));
 
       if (res.user.role === 'DATA_STEWARD') {
         setActiveView('quarantine');
@@ -468,25 +487,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       navigate('/dashboard');
     } catch (err: any) {
-      if (IS_DEMO_MODE) {
-        console.warn("Backend offline, demo mode fallback active");
-        const fallbackTenant: RbacTenant = email.includes('fin') ? 'FINANCE' : (email.includes('leg') ? 'LEGAL' : 'HR');
-        const fallbackRole: RbacRole = email.includes('admin') ? 'SYSTEM_ADMIN' : (email.includes('auditor') ? 'COMPLIANCE_AUDITOR' : 'DATA_STEWARD');
-        const fallbackUser: User = {
-          id: `usr-${Date.now().toString().slice(-4)}`,
-          name: email.split('@')[0],
-          email,
-          role: fallbackRole,
-          tenant: fallbackTenant,
-          token: 'demo-token',
-          avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`
-        };
-        setUser(fallbackUser);
-        setIsAuthenticated(true);
-        setSelectedTenant(fallbackTenant);
-        navigate('/dashboard');
-        return;
-      }
       addToast({
         type: 'rose',
         title: 'Authentication Failed',
@@ -494,6 +494,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       throw err;
     }
+  };
+
+  const updateUserPassword = (newToken: string) => {
+    if (!user) return;
+    const updatedUser: User = {
+      ...user,
+      token: newToken,
+      mustChangePassword: false
+    };
+    setUser(updatedUser);
+    setToken(newToken);
+    sessionStorage.setItem('auth_token', newToken);
+    sessionStorage.setItem('auth_user', JSON.stringify(updatedUser));
   };
 
   const loginAsDataSteward = () => {
@@ -520,15 +533,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     loginWithCredentials(targetEmail, 'password123');
   };
 
-  const logout = () => {
-    setUser(null);
-    setIsAuthenticated(false);
-    addToast({
-      type: 'info',
-      title: 'Logged Out',
-      description: 'JWT Token revoked. Session terminated.'
-    });
-    navigate('/login');
+  const logout = async () => {
+    try {
+      const activeToken = token || sessionStorage.getItem('auth_token');
+      if (activeToken) {
+        await logoutApi(activeToken);
+      }
+    } catch (err) {
+      console.warn("Backend logout error or offline", err);
+    } finally {
+      sessionStorage.removeItem('auth_token');
+      sessionStorage.removeItem('auth_user');
+      setUser(null);
+      setToken(null);
+      setIsAuthenticated(false);
+      addToast({
+        type: 'info',
+        title: 'Logged Out',
+        description: 'JWT Token revoked. Session terminated.'
+      });
+      navigate('/login');
+    }
   };
 
   const completeOnboarding = (workspaceName: string, targetVectorDb: string, ingestionMode: string) => {
@@ -763,8 +788,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       navigate,
       user,
       isAuthenticated,
-      token: user?.token || null,
+      token: token || user?.token || null,
       loginWithCredentials,
+      updateUserPassword,
       loginAsDataSteward,
       loginAsSystemAdmin,
       loginAsAuditor,

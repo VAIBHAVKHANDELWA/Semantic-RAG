@@ -16,12 +16,12 @@ export const ManualMergeModal: React.FC<ManualMergeModalProps> = ({
   onClose,
   onConfirmMerge
 }) => {
-  if (!isOpen) return null;
-
   // Pre-fill merged text with incoming text + rationale comment
   const defaultMergedText = `// RECONCILED POLICY CHUNK (MANUAL MERGE BY COMPLIANCE AUDITOR)\n// Derived from Existing (${conflict.existingChunk.docName}) & Incoming (${conflict.incomingChunk.docName})\n\n${conflict.incomingChunk.text}`;
 
   const [mergedText, setMergedText] = useState(defaultMergedText);
+
+  if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

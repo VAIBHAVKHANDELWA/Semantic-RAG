@@ -6,13 +6,49 @@ export const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 
 export interface AuthResponse {
   token: string;
+  mustChangePassword?: boolean;
   user: {
     id: string;
     email: string;
     name: string;
     role: RbacRole;
     tenant: RbacTenant;
+    isSuperAdmin?: boolean;
   };
+}
+
+export interface ChangePasswordResponse {
+  message: string;
+  token: string;
+}
+
+export interface AdminUserResponse {
+  id: string;
+  email: string;
+  displayName: string;
+  role: RbacRole;
+  tenantId: string;
+  active: boolean;
+  mustChangePassword: boolean;
+  failedLoginAttempts?: number;
+  lockedUntil?: string | null;
+  lastLoginAt?: string | null;
+  createdBy?: string | null;
+  isSuperAdmin?: boolean;
+  createdAt?: string;
+  temporaryPassword?: string;
+}
+
+export interface CreateUserRequest {
+  email: string;
+  displayName: string;
+  role: string;
+  tenantId: string;
+}
+
+export interface PatchUserRequest {
+  role?: string;
+  active?: boolean;
 }
 
 export async function apiRequest<T>(
@@ -27,8 +63,10 @@ export async function apiRequest<T>(
     headers.set('Content-Type', 'application/json');
   }
   
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
+  // Attach token if provided or retrieve from sessionStorage
+  const activeToken = token || (typeof window !== 'undefined' ? sessionStorage.getItem('auth_token') : null);
+  if (activeToken) {
+    headers.set('Authorization', `Bearer ${activeToken}`);
   }
 
   const response = await fetch(url, {
@@ -51,3 +89,56 @@ export async function loginApi(email: string, password: string): Promise<AuthRes
   });
 }
 
+export async function changePasswordApi(
+  oldPassword: string,
+  newPassword: string,
+  token?: string | null
+): Promise<ChangePasswordResponse> {
+  return apiRequest<ChangePasswordResponse>('/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ oldPassword, newPassword }),
+  }, token);
+}
+
+export async function logoutApi(token?: string | null): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>('/auth/logout', {
+    method: 'POST',
+  }, token);
+}
+
+// Admin User Management Endpoints
+export async function adminListUsers(token?: string | null): Promise<AdminUserResponse[]> {
+  return apiRequest<AdminUserResponse[]>('/admin/users', {
+    method: 'GET',
+  }, token);
+}
+
+export async function adminCreateUser(
+  req: CreateUserRequest,
+  token?: string | null
+): Promise<AdminUserResponse> {
+  return apiRequest<AdminUserResponse>('/admin/users', {
+    method: 'POST',
+    body: JSON.stringify(req),
+  }, token);
+}
+
+export async function adminPatchUser(
+  id: string,
+  req: PatchUserRequest,
+  token?: string | null
+): Promise<AdminUserResponse> {
+  return apiRequest<AdminUserResponse>(`/admin/users/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(req),
+  }, token);
+}
+
+export async function adminResetPassword(
+  id: string,
+  token?: string | null
+): Promise<AdminUserResponse> {
+  return apiRequest<AdminUserResponse>(`/admin/users/${id}/reset-password`, {
+    method: 'POST',
+  }, token);
+}
