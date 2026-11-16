@@ -44,7 +44,7 @@ public class IngestionController {
      * Generates a 15-minute Direct-to-Cloud MinIO/S3 Presigned Upload URL enforcing tenant isolation from JWT.
      */
     @GetMapping("/upload-ticket")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('DATA_STEWARD')")
     public ResponseEntity<UploadTicketResponseDTO> getUploadTicket(
             @RequestParam("fileName") String fileName,
             Authentication authentication
@@ -61,7 +61,7 @@ public class IngestionController {
      * Creates an ingestion job row in PostgreSQL and dispatches the task to RabbitMQ raw-document-queue.
      */
     @PostMapping("/complete")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('DATA_STEWARD')")
     public ResponseEntity<Map<String, Object>> completeIngestion(
             @RequestBody IngestionCompleteRequestDTO request,
             Authentication authentication
@@ -71,6 +71,12 @@ public class IngestionController {
 
         if (request.getObjectKey() == null || request.getObjectKey().trim().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "objectKey is required");
+        }
+
+        // Validate cross-tenant target if explicitly supplied
+        if (request.getTenantId() != null && !request.getTenantId().trim().isEmpty() && !request.getTenantId().trim().equalsIgnoreCase(tenantId)) {
+            log.error("Tenant isolation violation: User from Tenant [{}] attempted to complete ingestion for Tenant [{}]", tenantId, request.getTenantId());
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cross-tenant ingestion is strictly prohibited");
         }
 
         // Validate that objectKey belongs strictly to the authenticated tenant
@@ -114,7 +120,7 @@ public class IngestionController {
      * Lists ingestion jobs strictly scoped to the authenticated tenant.
      */
     @GetMapping("/jobs")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('DATA_STEWARD', 'SYSTEM_ADMIN')")
     public ResponseEntity<List<IngestionJob>> getIngestionJobs(Authentication authentication) {
         String tenantId = extractTenant(authentication);
         List<IngestionJob> jobs = ingestionJobRepository.findByTenantIdOrderByCreatedAtDesc(tenantId);
@@ -126,7 +132,7 @@ public class IngestionController {
      * Synchronous Apache Tika fallback parser.
      */
     @PostMapping("/parse-local-sync")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('DATA_STEWARD')")
     public ResponseEntity<ParsedDocumentDTO> parseLocalSync(
             @RequestParam("file") MultipartFile file
     ) {

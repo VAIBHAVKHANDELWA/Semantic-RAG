@@ -61,7 +61,7 @@ public class GovernanceController {
      * Resolves a quarantine conflict, records hash-chained audit log, and writes provenance edge.
      */
     @PostMapping("/quarantine/{id}/resolve")
-    @PreAuthorize("hasAnyRole('DATA_STEWARD', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasRole('DATA_STEWARD')")
     public ResponseEntity<QuarantineConflict> resolveConflict(
             @PathVariable("id") String id,
             @RequestBody ConflictResolutionRequestDTO request,
@@ -109,7 +109,7 @@ public class GovernanceController {
      * Fetches provenance edges for lineage graph rendering.
      */
     @GetMapping("/provenance/{conflictId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('DATA_STEWARD', 'SYSTEM_ADMIN')")
     public ResponseEntity<List<ProvenanceEdge>> getProvenanceEdges(
             @PathVariable("conflictId") String conflictId,
             Authentication authentication

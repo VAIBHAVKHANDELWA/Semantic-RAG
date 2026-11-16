@@ -12,4 +12,5 @@ import lombok.NoArgsConstructor;
 public class IngestionCompleteRequestDTO {
     private String objectKey;
     private String fileName;
+    private String tenantId;
 }
