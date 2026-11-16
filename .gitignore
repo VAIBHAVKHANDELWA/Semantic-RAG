@@ -71,7 +71,7 @@ coverage/
 .nyc_output/
 *.docx
 /test_*.py
-!tests/**
+!tests/*.py
 build_full_report.py
 docx_engine_core.py
 

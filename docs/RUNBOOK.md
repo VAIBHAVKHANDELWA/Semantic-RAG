@@ -197,6 +197,7 @@ All seeded users have the default password: **`password123`**
 
 | Key Pattern | Data Structure | TTL | Purpose |
 | :--- | :--- | :--- | :--- |
+| `denylist:jwt:{jti}` | String | Token Lifetime | Invalidation denylist for revoked JWT tokens on logout |
 | `dedup:{tenant}:{sha256(chunk)}` | String (`SET NX`) | None | Exact duplicate text pruning before embedding computation |
 | `adj:{tenant}:{sha256(a)}:{sha256(b)}` | String (JSON) | 30 days | Adjudication verdict cache for identical policy comparisons |
 | `rl:{userId}:{minute}` | Integer (Counter) | 60 sec | Sliding window rate limiting per user |
@@ -205,7 +206,38 @@ All seeded users have the default password: **`password123`**
 
 ---
 
-### 8. Troubleshooting & Diagnostics
+### 8. Authentication & User Governance Operations
+
+#### Seeded Administrative & Tenant Users
+All seeded demo users are re-hashed via Flyway migration `V5__fix_seed_password_hashes.sql` using PostgreSQL `pgcrypto` (`crypt('password123', gen_salt('bf', 10))`):
+
+| Email | Role | Department / Tenant | Privileges | Initial Password |
+| :--- | :--- | :--- | :--- | :--- |
+| `superadmin@enterprise.com` | `SYSTEM_ADMIN` | `GLOBAL` | Super Admin (Cross-Tenant) | `password123` |
+| `hr_admin@enterprise.com` | `SYSTEM_ADMIN` | `HR` | Tenant Admin (`HR` Only) | `password123` |
+| `hr_steward@enterprise.com` | `DATA_STEWARD` | `HR` | Data Steward (`HR` Scope) | `password123` |
+| `legal_auditor@enterprise.com` | `COMPLIANCE_AUDITOR` | `LEGAL` | Compliance Auditor | `password123` |
+| `finance_steward@enterprise.com` | `DATA_STEWARD` | `FINANCE` | Data Steward (`FINANCE` Scope) | `password123` |
+| `eng_steward@enterprise.com` | `DATA_STEWARD` | `ENGINEERING` | Data Steward (`ENGINEERING` Scope)| `password123` |
+
+#### Key Identity & Governance Endpoints
+- `POST /api/v1/auth/login`: Authenticates user against Postgres users table; enforces 5-attempt lockout (15 minutes); returns JWT and `mustChangePassword` flag.
+- `POST /api/v1/auth/change-password`: Updates password enforcing policy (min 10 chars, letter, digit, non-identical to old). Reissues unblocked token.
+- `POST /api/v1/auth/logout`: Revokes token by adding its `jti` to the Redis denylist.
+- `GET /api/v1/admin/users`: Lists users (filtered by tenant for tenant-admin, global for super-admin).
+- `POST /api/v1/admin/users`: Provisions user account with temporary password; enforces tenant boundaries; logs hash-chained audit row.
+- `PATCH /api/v1/admin/users/{id}`: Modifies user role or active status (self-disable blocked).
+- `POST /api/v1/admin/users/{id}/reset-password`: Issues new temporary password and resets lockout.
+
+#### Running the Automated Security & Auth Test Suite
+Execute the end-to-end security regression suite verifying lockout, anti-enumeration, password policies, token denylisting, RBAC, and hash-chain integrity:
+```bash
+python tests/test_auth_governance.py
+```
+
+---
+
+### 9. Troubleshooting & Diagnostics
 
 - **RabbitMQ Queue Backlog:** Inspect queue status at `http://localhost:15672` (Queue: `raw-document-queue`). If messages are accumulating, verify that Python worker `queue_worker.py` is running.
 - **MinIO Connection Errors:** Ensure the bucket `semantic-rag-uploads` exists and that CORS allows `PUT` from origin `http://localhost:5173`.
