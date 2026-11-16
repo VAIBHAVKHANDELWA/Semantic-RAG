@@ -27,4 +27,4 @@ Updated strictly after each verified commit.
 | **T1.6** | ✅ DONE | Commit `4c87359`: Purged synthetic random intervals/mocks in `SystemLogsView` and `AppContext`; driven by real SSE/metrics. | Verified via TypeScript build. |
 | **T2.1** | ✅ DONE | Commit `d11ddb7`: Automated test suite in `tests/test_e2e_platform.py` (TC-01..TC-06, RBAC matrix, audit tamper check) and `tests/run_verification.py`. | Verified execution passes. |
 | **T2.2** | ✅ DONE | Commit `5a69213`: Benchmark scripts in `benchmarks/` and `RESULTS.md` with measured threshold calibration curve (96.8% recall at $\tau=0.85$), pgvector memory sizing, and gateway latency profiles. | Verified values documented. |
-| **T2.3** | ✅ DONE | Commit pending: `docs/REPORT_FIXES.md` cataloging all 12 architectural findings, false/unmeasured report claims, replacement text, and Table 4.2 RBAC matrix. | Review report document against checklist. |
+| **T2.3** | ✅ DONE | Commit `273e5bd`: `docs/REPORT_FIXES.md` cataloging all 12 architectural findings, false/unmeasured report claims, replacement text, and Table 4.2 RBAC matrix. | Review report document against checklist. |
