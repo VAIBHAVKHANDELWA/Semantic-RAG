@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class LoginResponseDTO {
     private String token;
+    private Boolean mustChangePassword;
     private UserDTO user;
 
     @Data
@@ -23,6 +24,6 @@ public class LoginResponseDTO {
         private String name;
         private String role;
         private String tenant;
+        private Boolean isSuperAdmin;
     }
 }
-
