@@ -11,56 +11,35 @@ import { motion } from 'framer-motion';
 interface LogLine {
   id: string;
   timestamp: string;
-  service: 'RABBITMQ' | 'REDIS_CACHE' | 'PYTHON_WORKER' | 'JAVA_GATEWAY' | 'CIRCUIT_BREAKER';
+  service: 'RABBITMQ' | 'REDIS_CACHE' | 'PYTHON_WORKER' | 'JAVA_GATEWAY' | 'CIRCUIT_BREAKER' | 'SSE_TELEMETRY';
   level: 'INFO' | 'WARN' | 'ERROR' | 'DEBUG';
   message: string;
 }
 
-const INITIAL_LOGS: LogLine[] = [
-  { id: 'log-1', timestamp: '19:24:01.102', service: 'JAVA_GATEWAY', level: 'INFO', message: 'POST /api/v1/ingest - JWT claims verified for tenant HR (sarah.jenkins@enterprise.ai)' },
-  { id: 'log-2', timestamp: '19:24:01.450', service: 'RABBITMQ', level: 'INFO', message: 'Published job [ing-101] to exchange vector.ingest.hr (rate: 1,240 msg/s)' },
-  { id: 'log-3', timestamp: '19:24:01.890', service: 'REDIS_CACHE', level: 'DEBUG', message: 'Semantic cache MISS for SHA256(chunk_77a8). Forwarding to MiniLM GPU worker pool.' },
-  { id: 'log-4', timestamp: '19:24:02.120', service: 'PYTHON_WORKER', level: 'INFO', message: 'MiniLM-L6-v2 batch embedding complete (batch_size=32, latency=14.2ms, GPU_mem=4.2GB)' },
-  { id: 'log-5', timestamp: '19:24:02.400', service: 'CIRCUIT_BREAKER', level: 'INFO', message: 'LLM Circuit Breaker status: CLOSED (Failure rate: 0.00%, threshold: 15.00%)' },
-  { id: 'log-6', timestamp: '19:24:03.010', service: 'RABBITMQ', level: 'WARN', message: 'Worker queue vector.collision.finance backpressure detected (lag: 1.4ms)' },
-  { id: 'log-7', timestamp: '19:24:03.550', service: 'REDIS_CACHE', level: 'INFO', message: 'Pruned 14 duplicate vector keys under namespace b2b_hr_policies (saved 12.4MB RAM)' }
-];
-
 export const SystemLogsView: React.FC = () => {
-  const { telemetry } = useApp();
-  const [logs, setLogs] = useState<LogLine[]>(INITIAL_LOGS);
+  const { sseLogs } = useApp();
+  const [logs, setLogs] = useState<LogLine[]>([]);
   const [isStreaming, setIsStreaming] = useState(true);
 
+  // Sync real-time SSE telemetry payloads into live terminal logs
   useEffect(() => {
-    if (!isStreaming) return;
+    if (!isStreaming || !sseLogs || sseLogs.length === 0) return;
 
-    const interval = setInterval(() => {
-      const now = new Date();
-      const timeStr = now.toTimeString().slice(0, 8) + '.' + String(now.getMilliseconds()).padStart(3, '0');
-      
-      const sampleMessages = [
-        { service: 'RABBITMQ', level: 'INFO', message: `Dispatched ${Math.floor(Math.random()*50)+10} chunks to pgvector indexer queue.` },
-        { service: 'REDIS_CACHE', level: 'DEBUG', message: `Semantic cache HIT (similarity=0.982) for query vector ID vec-${Math.floor(Math.random()*8000)+1000}.` },
-        { service: 'PYTHON_WORKER', level: 'INFO', message: `GPU load at ${telemetry.pythonGpuLoad}%. Active PyTorch worker instances: 8.` },
-        { service: 'JAVA_GATEWAY', level: 'INFO', message: `Auth token refreshed for tenant LEGAL (isolation=Encrypted Tenant Context).` },
-        { service: 'CIRCUIT_BREAKER', level: 'INFO', fontBold: true, message: 'Telemetry heartbeat sync ok. 0 dropped packets.' }
-      ];
+    const latest = sseLogs[0];
+    const newLog: LogLine = {
+      id: `sse-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      timestamp: latest.timestamp || new Date().toTimeString().slice(0, 8),
+      service: 'SSE_TELEMETRY',
+      level: latest.circuitBreakerStatus === 'OPEN' ? 'WARN' : 'INFO',
+      message: latest.logMessage || `Job [${latest.jobId}]: Status ${latest.status} (${latest.chunksCreated} chunks, ${latest.conflictsFound} conflicts)`
+    };
 
-      const chosen = sampleMessages[Math.floor(Math.random() * sampleMessages.length)];
-
-      const newLog: LogLine = {
-        id: `log-${Date.now()}`,
-        timestamp: timeStr,
-        service: chosen.service as any,
-        level: chosen.level as any,
-        message: chosen.message
-      };
-
-      setLogs(prev => [newLog, ...prev.slice(0, 49)]);
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [isStreaming, telemetry.pythonGpuLoad]);
+    setLogs(prev => {
+      // Avoid duplicate logs with exact same message
+      if (prev.length > 0 && prev[0].message === newLog.message) return prev;
+      return [newLog, ...prev.slice(0, 49)];
+    });
+  }, [sseLogs, isStreaming]);
 
   return (
     <motion.div 
@@ -115,35 +94,44 @@ export const SystemLogsView: React.FC = () => {
 
         {/* Logs Terminal Output */}
         <div className="p-4 font-mono text-xs space-y-2 max-h-[550px] overflow-y-auto">
-          {logs.map(log => {
-            const levelColors = {
-              INFO: 'text-cyan-400',
-              WARN: 'text-amber-400',
-              ERROR: 'text-rose-400',
-              DEBUG: 'text-slate-500'
-            };
+          {logs.length === 0 ? (
+            <div className="py-12 text-center text-slate-500 space-y-2">
+              <Terminal className="w-8 h-8 mx-auto text-slate-600 opacity-50" />
+              <p>No telemetry events logged yet in current session.</p>
+              <p className="text-[11px] text-slate-600">Events will stream here automatically via SSE when ingestion jobs run.</p>
+            </div>
+          ) : (
+            logs.map(log => {
+              const levelColors: Record<string, string> = {
+                INFO: 'text-cyan-400',
+                WARN: 'text-amber-400',
+                ERROR: 'text-rose-400',
+                DEBUG: 'text-slate-500'
+              };
 
-            const servicePills = {
-              RABBITMQ: 'bg-purple-500/10 text-purple-300 border-purple-500/30',
-              REDIS_CACHE: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30',
-              PYTHON_WORKER: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
-              JAVA_GATEWAY: 'bg-blue-500/10 text-blue-300 border-blue-500/30',
-              CIRCUIT_BREAKER: 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-            };
+              const servicePills: Record<string, string> = {
+                RABBITMQ: 'bg-purple-500/10 text-purple-300 border-purple-500/30',
+                REDIS_CACHE: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30',
+                PYTHON_WORKER: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
+                JAVA_GATEWAY: 'bg-blue-500/10 text-blue-300 border-blue-500/30',
+                CIRCUIT_BREAKER: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
+                SSE_TELEMETRY: 'bg-teal-500/10 text-teal-300 border-teal-500/30'
+              };
 
-            return (
-              <div key={log.id} className="flex flex-col sm:flex-row sm:items-center gap-2 p-1.5 hover:bg-slate-900/60 rounded transition-colors">
-                <span className="text-slate-600 text-[11px] shrink-0">{log.timestamp}</span>
-                <span className={`px-1.5 py-0.5 rounded border text-[10px] font-bold shrink-0 ${servicePills[log.service]}`}>
-                  {log.service}
-                </span>
-                <span className={`text-[10px] font-bold shrink-0 ${levelColors[log.level]}`}>
-                  [{log.level}]
-                </span>
-                <span className="text-slate-300 truncate">{log.message}</span>
-              </div>
-            );
-          })}
+              return (
+                <div key={log.id} className="flex flex-col sm:flex-row sm:items-center gap-2 p-1.5 hover:bg-slate-900/60 rounded transition-colors">
+                  <span className="text-slate-600 text-[11px] shrink-0">{log.timestamp}</span>
+                  <span className={`px-1.5 py-0.5 rounded border text-[10px] font-bold shrink-0 ${servicePills[log.service] || servicePills.SSE_TELEMETRY}`}>
+                    {log.service}
+                  </span>
+                  <span className={`text-[10px] font-bold shrink-0 ${levelColors[log.level] || 'text-slate-400'}`}>
+                    [{log.level}]
+                  </span>
+                  <span className="text-slate-300 truncate">{log.message}</span>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </motion.div>

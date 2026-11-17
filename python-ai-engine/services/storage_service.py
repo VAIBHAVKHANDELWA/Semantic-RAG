@@ -53,9 +53,13 @@ class StorageService:
                 text = tika_response.text.strip()
                 logger.info(f"Tika extracted {len(text)} chars from [{object_key}]")
             else:
+                if any(object_key.lower().endswith(ext) for ext in ('.pdf', '.docx', '.doc', '.bin', '.zip')):
+                    raise RuntimeError(f"Tika extraction failed for binary document [{object_key}]: HTTP {tika_response.status_code}")
                 logger.warning(f"Tika returned HTTP {tika_response.status_code}, falling back to UTF-8 decode")
                 text = file_bytes.decode("utf-8", errors="replace").strip()
         except Exception as e:
+            if any(object_key.lower().endswith(ext) for ext in ('.pdf', '.docx', '.doc', '.bin', '.zip')):
+                raise RuntimeError(f"Extraction failed for corrupt binary document [{object_key}]: {e}")
             logger.warning(f"Tika REST extraction unavailable ({e}), falling back to direct decode")
             try:
                 text = file_bytes.decode("utf-8").strip()
