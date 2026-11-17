@@ -3,9 +3,11 @@ package com.middleware.gateway.services;
 import com.middleware.gateway.models.ComplianceAuditLog;
 import com.middleware.gateway.models.ProvenanceEdge;
 import com.middleware.gateway.models.QuarantineConflict;
+import com.middleware.gateway.models.VectorChunk;
 import com.middleware.gateway.repositories.ComplianceAuditLogRepository;
 import com.middleware.gateway.repositories.ProvenanceEdgeRepository;
 import com.middleware.gateway.repositories.QuarantineConflictRepository;
+import com.middleware.gateway.repositories.VectorChunkRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -30,6 +32,7 @@ public class GovernanceService {
     private final QuarantineConflictRepository conflictRepository;
     private final ComplianceAuditLogRepository auditLogRepository;
     private final ProvenanceEdgeRepository provenanceRepository;
+    private final VectorChunkRepository vectorChunkRepository;
     private final SseConnectionManager sseConnectionManager;
 
     @Transactional(readOnly = true)
@@ -71,6 +74,16 @@ public class GovernanceService {
         conflict.setResolvedBy(actorId);
         conflict.setResolvedAt(LocalDateTime.now());
         conflictRepository.save(conflict);
+
+        // Soft-archive existing vector chunk when incoming policy is promoted
+        if ("PROMOTED_INCOMING".equals(normalizedAction) && conflict.getExistingChunkId() != null) {
+            vectorChunkRepository.findById(conflict.getExistingChunkId()).ifPresent(chunk -> {
+                chunk.setStatus("ARCHIVED");
+                chunk.setSupersededBy(conflict.getId());
+                vectorChunkRepository.save(chunk);
+                log.info("Soft-archived superseded vector chunk [{}] in PostgreSQL pgvector", chunk.getId());
+            });
+        }
 
         // 1. Provenance edge
         String edgeId = "pe-" + UUID.randomUUID().toString().substring(0, 8);

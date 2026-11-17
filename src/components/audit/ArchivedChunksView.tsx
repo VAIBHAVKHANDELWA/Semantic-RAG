@@ -1,15 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Archive, Search, Clock, Database, Eye, X, ShieldCheck } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { GlassCard } from '../common/GlassCard';
 import type { ChunkMetadata } from '../../types';
+import { verifyAuditChain, fetchArchivedChunks } from '../../api/audit';
 
 export const ArchivedChunksView: React.FC = () => {
-  const { archivedChunks, selectedTenant, user } = useApp();
+  const { archivedChunks: contextArchivedChunks, selectedTenant, user } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedChunk, setSelectedChunk] = useState<ChunkMetadata | null>(null);
+  const [liveArchivedChunks, setLiveArchivedChunks] = useState<ChunkMetadata[]>([]);
+  const [auditStatus, setAuditStatus] = useState<{ verified: boolean; totalEntries: number; message?: string } | null>(null);
 
-  const filteredChunks = archivedChunks.filter(c => {
+  useEffect(() => {
+    fetchArchivedChunks(user?.token).then(chunks => {
+      if (chunks && chunks.length > 0) {
+        setLiveArchivedChunks(chunks);
+      }
+    });
+
+    verifyAuditChain(user?.token).then(res => {
+      if (res) {
+        setAuditStatus(res);
+      }
+    }).catch(err => console.debug('Audit chain verify ping:', err));
+  }, [user?.token, selectedTenant]);
+
+  const sourceChunks = liveArchivedChunks.length > 0 ? liveArchivedChunks : contextArchivedChunks;
+
+  const filteredChunks = sourceChunks.filter(c => {
     if (selectedTenant !== 'ALL' && c.tenantId !== selectedTenant) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -20,6 +39,14 @@ export const ArchivedChunksView: React.FC = () => {
     }
     return true;
   });
+
+  // Compute real date window
+  const years = filteredChunks
+    .map(c => c.docYear || (c.uploadDate ? parseInt(c.uploadDate.slice(0, 4)) : null))
+    .filter((y): y is number => y !== null && !isNaN(y));
+  const minYear = years.length > 0 ? Math.min(...years) : null;
+  const maxYear = years.length > 0 ? Math.max(...years) : null;
+  const temporalWindow = minYear && maxYear ? (minYear === maxYear ? `${minYear}` : `${minYear} – ${maxYear}`) : 'N/A';
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -72,8 +99,12 @@ export const ArchivedChunksView: React.FC = () => {
             <ShieldCheck className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-2xl font-bold font-mono text-emerald-400">100%</div>
-            <div className="text-xs text-slate-400">Audit Compliance Guarantee</div>
+            <div className={`text-2xl font-bold font-mono ${auditStatus?.verified !== false ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {auditStatus ? (auditStatus.verified ? 'Verified' : 'Tampered') : 'Verifying...'}
+            </div>
+            <div className="text-xs text-slate-400">
+              Audit Chain Integrity ({auditStatus?.totalEntries ?? 0} entries)
+            </div>
           </div>
         </GlassCard>
 
@@ -82,7 +113,7 @@ export const ArchivedChunksView: React.FC = () => {
             <Clock className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-2xl font-bold font-mono text-cyan-300">2018 – 2026</div>
+            <div className="text-2xl font-bold font-mono text-cyan-300">{temporalWindow}</div>
             <div className="text-xs text-slate-400">Temporal Coverage Window</div>
           </div>
         </GlassCard>

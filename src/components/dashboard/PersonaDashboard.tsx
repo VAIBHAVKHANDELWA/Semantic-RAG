@@ -1,29 +1,26 @@
 import React, { useState } from 'react';
-import { 
-  ShieldAlert, 
-  Search, 
-  Database, 
-  DollarSign, 
-  Activity, 
-  Zap, 
-  CheckCircle2, 
-  Sparkles, 
-  FileCheck, 
-  Sliders, 
-  Building2, 
+import {
+  ShieldAlert,
+  Search,
+  Database,
+  DollarSign,
+  Activity,
+  Zap,
+  CheckCircle2,
+  Sparkles,
+  FileCheck,
+  Sliders,
+  Building2,
   Clock,
   ArrowRight,
-  GitBranch,
-  TrendingUp,
-  ShieldCheck,
-  Users
+  ShieldCheck
 } from 'lucide-react';
-import { 
-  AreaChart, 
-  Area, 
-  ResponsiveContainer, 
-  BarChart, 
-  Bar 
+import {
+  AreaChart,
+  Area,
+  ResponsiveContainer,
+  BarChart,
+  Bar
 } from 'recharts';
 import { useApp } from '../../context/AppContext';
 import { GlassCard } from '../common/GlassCard';
@@ -52,7 +49,7 @@ const ADMIN_PERFORMANCE_DATA = [
 ];
 
 export const PersonaDashboard: React.FC = () => {
-  const { user, selectedTenant, conflicts, telemetry, setActiveView, activeView } = useApp();
+  const { user, selectedTenant, conflicts, telemetry, setActiveView, activeView, tenants, auditLogs } = useApp();
   const [vectorSearchQuery, setVectorSearchQuery] = useState('');
   const [searchedVectorId, setSearchedVectorId] = useState<string | null>(null);
 
@@ -61,10 +58,11 @@ export const PersonaDashboard: React.FC = () => {
 
   // Filter conflicts for Data Steward
   const tenantConflicts = conflicts.filter(c => {
+    const dept = c.department || c.tenantId || tenant;
     if (selectedTenant !== 'ALL') {
-      return c.department === selectedTenant;
+      return dept === selectedTenant;
     }
-    return c.department === tenant || selectedTenant === 'ALL';
+    return dept === tenant || selectedTenant === 'ALL';
   });
 
   const pendingTenantConflicts = tenantConflicts.filter(c => c.status === 'PENDING');
@@ -106,6 +104,22 @@ export const PersonaDashboard: React.FC = () => {
     return <AiPipelineVisualizer />;
   }
 
+  if (activeView === 'lineage') {
+    return (
+      <div className="p-6 max-w-7xl mx-auto space-y-6">
+        <LineageGraph />
+      </div>
+    );
+  }
+
+  if (activeView === 'quarantine') {
+    return (
+      <div className="p-6 max-w-7xl mx-auto space-y-6">
+        <QuarantineCenter />
+      </div>
+    );
+  }
+
   if (activeView === 'ingestion') {
     return (
       <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -120,7 +134,7 @@ export const PersonaDashboard: React.FC = () => {
       {/* PERSONA 1: DATA STEWARD LAYOUT                                      */}
       {/* ------------------------------------------------------------------- */}
       {role === 'DATA_STEWARD' && (
-        <motion.div 
+        <motion.div
           key="steward-layout"
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
@@ -134,7 +148,7 @@ export const PersonaDashboard: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Building2 className="w-5 h-5 text-cyan-400" />
                 <h2 className="text-xl font-bold text-slate-100">{tenant} Vector Health Workspace</h2>
-                <StatusBadge status="clean" label="HARDWARE ISOLATED" />
+                <StatusBadge status="clean" label="POSTGRESQL RLS ENFORCED" />
               </div>
               <p className="text-xs text-slate-400 mt-1">
                 Data Steward Portal for reviewing semantic policy collisions and approving vector store commits for {tenant}.
@@ -143,7 +157,7 @@ export const PersonaDashboard: React.FC = () => {
 
             <div className="flex items-center gap-3 font-mono text-xs">
               <span className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300">
-                Index: <span className="text-cyan-400 font-bold">b2b_{tenant.toLowerCase()}_policies</span>
+                Index: <span className="text-cyan-400 font-bold">idx_vector_chunks_hnsw (pgvector)</span>
               </span>
             </div>
           </div>
@@ -179,7 +193,7 @@ export const PersonaDashboard: React.FC = () => {
                     {tenant} Ingested Documents
                   </div>
                   <div className="text-3xl font-extrabold text-slate-100 font-mono mt-1">
-                    {telemetry.quarantinedPendingCount + telemetry.exactDuplicatesPruned + (telemetry.processedTotal || 15)} <span className="text-xs font-normal text-slate-400">docs</span>
+                    {tenants.find(t => t.code === tenant)?.totalIngestedDocs ?? 0} <span className="text-xs font-normal text-slate-400">docs</span>
                   </div>
                 </div>
                 <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
@@ -187,8 +201,8 @@ export const PersonaDashboard: React.FC = () => {
                 </div>
               </div>
               <div className="text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/80 flex justify-between">
-                <span>Modality Breakdown:</span>
-                <span className="text-cyan-300 font-bold">82% PDF / 18% OCR</span>
+                <span>Modality:</span>
+                <span className="text-cyan-300 font-bold">Native Text & PDF (Tika)</span>
               </div>
             </GlassCard>
 
@@ -200,7 +214,7 @@ export const PersonaDashboard: React.FC = () => {
                     Resolved & Pruned Vectors
                   </div>
                   <div className="text-3xl font-extrabold text-emerald-400 font-mono mt-1">
-                    {telemetry.exactDuplicatesPruned + conflicts.filter(c => c.status !== 'PENDING').length} <span className="text-xs font-normal text-slate-400">cleared</span>
+                    {conflicts.filter(c => (c.department === tenant || selectedTenant === 'ALL') && c.status !== 'PENDING').length} <span className="text-xs font-normal text-slate-400">cleared</span>
                   </div>
                 </div>
                 <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
@@ -208,99 +222,31 @@ export const PersonaDashboard: React.FC = () => {
                 </div>
               </div>
               <div className="text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/80 flex justify-between">
-                <span>Vector Accuracy Index:</span>
-                <span className="text-emerald-300 font-bold">99.8% Clean</span>
+                <span>Reconciliation State:</span>
+                <span className="text-emerald-300 font-bold">Verified</span>
               </div>
             </GlassCard>
 
-            {/* Metric Card 4: Tenant-Specific Dynamic Pluggable Metric Card */}
-            {tenant === 'ENGINEERING' && (
-              <GlassCard glowColor="cyan" className="space-y-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                      GitHub Sync Status
-                    </div>
-                    <div className="text-2xl font-extrabold text-cyan-300 font-mono mt-1">
-                      Active <span className="text-xs font-normal text-slate-400">(PR #402)</span>
-                    </div>
+            {/* Metric Card 4: Audit Trail Records */}
+            <GlassCard glowColor="cyan" className="space-y-2">
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Audit Trail Records
                   </div>
-                  <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
-                    <GitBranch className="w-6 h-6 animate-pulse" />
+                  <div className="text-3xl font-extrabold text-cyan-300 font-mono mt-1">
+                    {auditLogs.filter(a => (a.department === tenant || selectedTenant === 'ALL')).length} <span className="text-xs font-normal text-slate-400">records</span>
                   </div>
                 </div>
-                <div className="text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/80 flex justify-between">
-                  <span>Latest Commit:</span>
-                  <span className="text-cyan-300 font-bold">#8f3a9e2</span>
+                <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+                  <ShieldCheck className="w-6 h-6" />
                 </div>
-              </GlassCard>
-            )}
-
-            {tenant === 'FINANCE' && (
-              <GlassCard glowColor="amber" className="space-y-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                      Q3 Report Anomalies
-                    </div>
-                    <div className="text-2xl font-extrabold text-amber-300 font-mono mt-1">
-                      14 <span className="text-xs font-normal text-slate-400">discrepancies</span>
-                    </div>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
-                    <TrendingUp className="w-6 h-6" />
-                  </div>
-                </div>
-                <div className="text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/80 flex justify-between">
-                  <span>Variance Threshold:</span>
-                  <span className="text-amber-300 font-bold">&gt;$5,000 CapEx</span>
-                </div>
-              </GlassCard>
-            )}
-
-            {tenant === 'LEGAL' && (
-              <GlassCard glowColor="rose" className="space-y-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                      NDA Clause Collisions
-                    </div>
-                    <div className="text-2xl font-extrabold text-rose-300 font-mono mt-1">
-                      8 <span className="text-xs font-normal text-slate-400">contracts</span>
-                    </div>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400">
-                    <ShieldCheck className="w-6 h-6" />
-                  </div>
-                </div>
-                <div className="text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/80 flex justify-between">
-                  <span>Jurisdiction Scope:</span>
-                  <span className="text-rose-300 font-bold">EU GDPR / CCPA</span>
-                </div>
-              </GlassCard>
-            )}
-
-            {(tenant === 'HR' || (tenant !== 'ENGINEERING' && tenant !== 'FINANCE' && tenant !== 'LEGAL')) && (
-              <GlassCard glowColor="emerald" className="space-y-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                      Policy Version Drift
-                    </div>
-                    <div className="text-2xl font-extrabold text-emerald-300 font-mono mt-1">
-                      3 <span className="text-xs font-normal text-slate-400">outdated</span>
-                    </div>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
-                    <Users className="w-6 h-6" />
-                  </div>
-                </div>
-                <div className="text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/80 flex justify-between">
-                  <span>Employee Scope:</span>
-                  <span className="text-emerald-300 font-bold">4,200 Staff</span>
-                </div>
-              </GlassCard>
-            )}
+              </div>
+              <div className="text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/80 flex justify-between">
+                <span>Ledger Integrity:</span>
+                <span className="text-cyan-300 font-bold">SHA-256 Signed</span>
+              </div>
+            </GlassCard>
           </div>
 
           {/* Main Data Steward View: Quarantine Queue or Polished Zero Conflicts Empty State */}
@@ -311,10 +257,10 @@ export const PersonaDashboard: React.FC = () => {
               </div>
               <h3 className="text-xl font-bold text-slate-100">Zero Conflicts in Queue</h3>
               <p className="text-xs text-slate-400 max-w-md mx-auto mt-1 leading-relaxed">
-                All semantic document vectors for the <span className="text-emerald-400 font-bold font-mono">{tenant}</span> department are clean, reconciled, and committed to Qdrant vector database.
+                All semantic document vectors for the <span className="text-emerald-400 font-bold font-mono">{tenant}</span> department are clean, reconciled, and committed to PostgreSQL pgvector (HNSW Index) database.
               </p>
               <div className="mt-6 flex items-center justify-center gap-3">
-                <button 
+                <button
                   onClick={() => setActiveView('ingestion')}
                   className="px-4 py-2 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-xs font-bold flex items-center gap-2 hover:bg-cyan-500/30 transition-colors"
                 >
@@ -332,7 +278,7 @@ export const PersonaDashboard: React.FC = () => {
       {/* PERSONA 2: SYSTEM ADMIN LAYOUT                                      */}
       {/* ------------------------------------------------------------------- */}
       {role === 'SYSTEM_ADMIN' && (
-        <motion.div 
+        <motion.div
           key="admin-layout"
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
@@ -456,7 +402,7 @@ export const PersonaDashboard: React.FC = () => {
       {/* PERSONA 3: COMPLIANCE AUDITOR LAYOUT                                */}
       {/* ------------------------------------------------------------------- */}
       {role === 'COMPLIANCE_AUDITOR' && (
-        <motion.div 
+        <motion.div
           key="auditor-layout"
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
@@ -518,29 +464,23 @@ export const PersonaDashboard: React.FC = () => {
               </button>
             </form>
 
-            <div className="flex flex-wrap items-center justify-center gap-3 text-xs font-mono text-slate-500 pt-2">
-              <span>Try sample vector IDs:</span>
-              <button 
-                onClick={() => setVectorSearchQuery('vec-77a8-4491-b01')}
-                className="text-cyan-400 hover:underline"
-              >
-                vec-77a8-4491-b01 (HR 2022)
-              </button>
-              <span>•</span>
-              <button 
-                onClick={() => setVectorSearchQuery('vec-99f2-1088-c44')}
-                className="text-cyan-400 hover:underline"
-              >
-                vec-99f2-1088-c44 (HR 2026)
-              </button>
-              <span>•</span>
-              <button 
-                onClick={() => setVectorSearchQuery('vec-11b3-3392-a12')}
-                className="text-cyan-400 hover:underline"
-              >
-                vec-11b3-3392-a12 (EU Legal)
-              </button>
-            </div>
+            {conflicts.length > 0 && (
+              <div className="flex flex-wrap items-center justify-center gap-3 text-xs font-mono text-slate-500 pt-2">
+                <span>Active conflict targets:</span>
+                {conflicts.slice(0, 3).map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => {
+                      setVectorSearchQuery(c.id);
+                      setSearchedVectorId(c.id);
+                    }}
+                    className="text-cyan-400 hover:underline"
+                  >
+                    {c.id} ({c.department})
+                  </button>
+                ))}
+              </div>
+            )}
           </GlassCard>
 
           {/* Interactive Lineage Tree */}

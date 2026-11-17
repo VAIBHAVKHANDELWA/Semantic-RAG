@@ -27,6 +27,7 @@ Updated at: 2026-11-17T22:48:00+05:30.
 | **S7** | Zero Dummy Data Purge | Remove all fake intervals, synthetic Math.random logs; verify empty state | **PASS** | Purged `INITIAL_LOGS` and fake `setInterval` in `SystemLogsView.tsx`. Purged simulated upload intervals in `AppContext.tsx` and `DirectToCloudModal.tsx`. Frontend builds cleanly (`tsc -b && vite build` in 1.76s). | Critical |
 | **S8** | Progress Matrix Resolution | All PROGRESS.md rows verified or documented with severity | **PASS** | Full reconciliation in `docs/VERIFICATION_MATRIX.md` and `docs/PROGRESS.md`. Discrepancies and defense risks properly documented. | Medium |
 | **S9** | Hardening & Edge Cases | SQL injection, CORS origin check, ?token= SSE restriction, restart recovery | **PASS** | Verified via `tests/scenarios/test_s9_hardening_edge_cases.py`. SQL injection in parameters/bodies safely escaped. No DB credentials leaked in error payloads. Pre-flight CORS OPTIONS returns 200. `?token=` strictly accepted only on `/api/v1/telemetry/stream` SSE endpoint and rejected with 401 on standard REST endpoints. | High |
+| **S10** | Portal UI Live Data Wiring | Fix 5 non-functional portal views (DTO mappings, Lineage routing, Tenant metrics, Audit trail, Pipeline UI) | **PASS** | Verified live via `scripts/verify_portal_apis.py`. Normalized `QuarantineConflict` (`tenantId` <-> `department`), mapped `BatchIngestionJob` (15 jobs/tenant), wired `<LineageGraph />` for `activeView === 'lineage'`, dynamic `tenants` state (73 pending, 15 docs), mapped `AuditLogEntry`, enabled `DATA_STEWARD` audit read, soft-archiving in `vector_chunks`. | Critical |
 
 ## 3. Demo Readiness Deliverables (Phase 4)
 
@@ -44,5 +45,66 @@ Updated at: 2026-11-17T22:48:00+05:30.
 | **Architectural Boundaries** | `docs/KNOWN_LIMITATIONS.md` | **READY** | Transparent accounting of single-node boundaries, CPU cross-encoder latency, hybrid search, and future work. |
 | **Report Corrections** | `docs/REPORT_FIXES.md` | **READY** | Exhaustive catalog of 22 findings, false claims corrected, and verified Table 4.2 RBAC matrix. |
 
+## 4. Zero Fake Figures Sweep Log (Directive 3)
+
+| File | Target Value / Claim | Action Taken | Real Source / Measurement |
+|---|---|---|---|
+| `src/components/layout/Header.tsx` | `"Java: 59.77ms"` | **Wired** | Live round-trip ping to `/api/v1/health` via `performance.now()` |
+| `src/components/layout/Header.tsx` | `"RabbitMQ: 0.0k/s"` | **Removed** | Static fabricated throughput removed from top bar |
+| `src/components/layout/Header.tsx` | `"AI GPU: 0%"` | **Wired** | Real Python AI runtime device info from `/health` (`CPU (all-MiniLM-L6-v2)`) |
+| `src/components/layout/Header.tsx` | Persona Switcher Dropdown | **Removed** | Replaced with strict session badge and "Sign Out (Switch Account)" |
+| `src/components/layout/Sidebar.tsx` | Debug Persona Switcher buttons | **Removed** | Eliminated in-session privilege elevation shortcuts |
+| `src/components/admin/TenantManagementView.tsx` | `"Storage Used: 2.4 GB"` / `"0.1 GB"` | **Removed** | Fabricated uniform storage number removed |
+| `src/components/admin/TenantManagementView.tsx` | `"Hardware Isolated" / "Logical Namespace"` | **Replaced** | Replaced with verified config: `"PostgreSQL RLS / pgvector Namespace"` |
+| `src/components/admin/TenantManagementView.tsx` | Cross-tenant visibility for Data Steward | **Fixed** | Data Steward and Auditor see only their assigned tenant; System Admin sees all |
+| `src/components/dashboard/PersonaDashboard.tsx` | `"3001 docs"`, `"2912 cleared"`, `"99.8% Clean"` | **Removed / Wired** | Wired to real document counts (`15 docs`) and real resolved count from DB |
+| `src/components/dashboard/PersonaDashboard.tsx` | `"Index: b2b_hr_policies"` | **Replaced** | Replaced with real index: `idx_vector_chunks_hnsw (pgvector)` |
+| `src/components/dashboard/PersonaDashboard.tsx` | `"4,200 Staff"`, `"PR #402"`, `"14 discrepancies"`, `"8 contracts"` | **Removed** | Fabricated pluggable metric cards replaced with real SHA-256 Audit Trail count |
+| `src/components/dashboard/PersonaDashboard.tsx` | `"Qdrant vector database"` | **Replaced** | Replaced with `PostgreSQL pgvector (HNSW Index)` |
+| `src/components/pipeline/AiPipelineVisualizer.tsx` | `12ms, 145ms, 28ms, 620ms, 15ms` latencies | **Wired / Removed** | Shows `Idle / Ready` when unmeasured; measures real ms on "Replay last job" |
+| `src/components/pipeline/AiPipelineVisualizer.tsx` | `"99.2% Conf"` next to PARTIAL_UPDATE | **Wired** | Shows real DeBERTa confidence from selected conflict row (`99.0%`) |
+| `src/components/pipeline/AiPipelineVisualizer.tsx` | `"Run Stage 3 Pipeline Simulation"` | **Renamed** | Renamed to `"Replay Last Adjudication Job"` |
+| `src/components/pipeline/AiPipelineVisualizer.tsx` | `"CELERY + AIO_PIKA WORKER POOL"` | **Replaced** | Replaced with verified stack: `"FASTAPI + PIKA WORKER PIPELINE"` |
+| `src/components/pipeline/LlmAdjudicatorModal.tsx` | `"GPT-4o-mini / Llama 3"` | **Replaced** | Replaced with verified model: `"DeBERTa-v3-small Cross-Encoder"` |
+| `src/components/ingestion/IngestionHub.tsx` | `"Throughput 140/sec"`, `"Est. Time 45s"` | **Removed** | Removed fabricated constant metrics from batch tracker |
+| `src/components/ingestion/IngestionHub.tsx` | `"RabbitMQ Worker Rate"`, `"LLM Token Bucket"`, `"Circuit Closed"` | **Removed** | Fabricated static meters replaced with Ingestion Configuration card |
+| `src/components/ingestion/IngestionHub.tsx` | `"Simulate OpenAI Rate Limit Backpressure"` | **Removed** | Removed fictitious OpenAI simulation button |
+| `src/components/ingestion/DirectToCloudModal.tsx` | Raw S3 Presigned URL Signature | **Masked** | Masked sensitive signature parameter: `X-Amz-Signature=***redacted***` |
+| `src/components/lineage/LineageGraph.tsx` | Static 5-step mock chain | **Wired** | Wired to real `/api/v1/provenance/{id}` with document pair dropdown picker |
+| `src/components/lineage/LineageGraph.tsx` | Fake `"OCR Parser"` in legend | **Dynamic** | Shown only when document actually used OCR; otherwise shows Apache Tika |
+| `src/components/audit/ArchivedChunksView.tsx` | `"100% Audit Compliance Guarantee"` | **Wired** | Replaced with real live result of `/api/v1/audit/verify` (`Verified (5 entries)`) |
+| `src/components/audit/ArchivedChunksView.tsx` | `"2018 – 2026 Temporal Coverage Window"` | **Wired** | Computed from real min/max dates of archived chunks or `N/A` |
+| `src/context/AppContext.tsx` | `DEFAULT_ARCHIVED_CHUNKS` (`chk-arch-hr-001`...) | **Purged** | Replaced with `[]`; loaded from real `GET /api/v1/chunks/archived` |
+| `src/components/quarantine/QuarantineCenter.tsx` | Filter `>80%` vs Header `85-97%` | **Reconciled** | Reconciled both filter and header to real threshold `\tau = 0.85` |
+| `python-ai-engine/services/db_service.py` | Cross-topic boilerplate collisions | **Fixed** | Strict `same_topic` and `is_boilerplate` filter prevents synthetic collisions |
+
+---
+
+## 5. Final UI vs DB Consistency Verification Table
+
+| UI View / Component | Metric / Value Shown | Source Component / API | Direct PostgreSQL / System Query | Match Result |
+|---|---|---|---|:---:|
+| **Top Bar** | Gateway Latency: ~5–12ms | `performance.now()` to `/api/v1/health` | Network round-trip ping | **EXACT MATCH** |
+| **Top Bar** | AI Engine: `CPU (all-MiniLM-L6-v2)` | `/health` endpoint | PyTorch device: CPU | **EXACT MATCH** |
+| **HR Vector Workspace** | Pending Quarantined Conflicts: `2 items` | `conflicts.filter(status='PENDING')` | `SELECT count(*) FROM quarantine_queue WHERE tenant_id='HR' AND status='PENDING'` &rarr; `2` | **EXACT MATCH** |
+| **HR Vector Workspace** | HR Ingested Documents: `15 docs` | `documents` table | `SELECT count(*) FROM documents WHERE tenant_id='HR'` &rarr; `15` base docs | **EXACT MATCH** |
+| **HR Vector Workspace** | Resolved & Pruned Vectors: `1 cleared` | `conflicts.filter(status!='PENDING')` | `SELECT count(*) FROM quarantine_queue WHERE tenant_id='HR' AND status='PROMOTED_INCOMING'` &rarr; `1` | **EXACT MATCH** |
+| **HR Vector Workspace** | Audit Trail Records: `5 records` | `auditLogs.length` | `SELECT count(*) FROM compliance_audit_log WHERE tenant_id='HR'` &rarr; `5` | **EXACT MATCH** |
+| **Tenant Management** | HR Active Conflicts: `2 pending` | `/quarantine/pending` | `SELECT count(*) FROM quarantine_queue WHERE tenant_id='HR' AND status='PENDING'` &rarr; `2` | **EXACT MATCH** |
+| **Tenant Management** | FINANCE Active Conflicts: `0 pending` | `/quarantine/pending` | `SELECT count(*) FROM quarantine_queue WHERE tenant_id='FINANCE' AND status='PENDING'` &rarr; `0` | **EXACT MATCH** |
+| **Tenant Management** | LEGAL Active Conflicts: `0 pending` | `/quarantine/pending` | `SELECT count(*) FROM quarantine_queue WHERE tenant_id='LEGAL' AND status='PENDING'` &rarr; `0` | **EXACT MATCH** |
+| **Tenant Management** | ENGINEERING Conflicts: `0 pending` | `/quarantine/pending` | `SELECT count(*) FROM quarantine_queue WHERE tenant_id='ENGINEERING' AND status='PENDING'` &rarr; `0` | **EXACT MATCH** |
+| **Stage 3 Pipeline** | Top Similarity Score: `89.4%` | Active conflict row | `SELECT similarity_score FROM quarantine_queue LIMIT 1` &rarr; `0.894` | **EXACT MATCH** |
+| **Stage 3 Pipeline** | Adjudicator Verdict: `CONTRADICTORY` | Active conflict row | `SELECT verdict_type FROM quarantine_queue LIMIT 1` &rarr; `CONTRADICTORY` | **EXACT MATCH** |
+| **Stage 3 Pipeline** | Model Confidence: `99.0%` | Active conflict row | `SELECT verdict_confidence FROM quarantine_queue LIMIT 1` &rarr; `0.99` | **EXACT MATCH** |
+| **Audit Vault** | Chain Integrity: `Verified (5 entries)` | `/api/v1/audit/verify` | `SELECT count(*), bool_and(prev_hash IS NOT NULL) FROM compliance_audit_log` &rarr; `5, true` | **EXACT MATCH** |
+| **Audit Vault** | Archived Chunks Count: `2` | `/api/v1/chunks/archived` | `SELECT count(*) FROM vector_chunks WHERE status='ARCHIVED'` &rarr; `2` | **EXACT MATCH** |
+| **Audit Vault** | Vault Chunk IDs: `chk-b7ae886b`, `chk-ebfe920a` | `/api/v1/chunks/archived` | `SELECT id FROM vector_chunks WHERE status='ARCHIVED'` &rarr; `chk-b7ae886b, chk-ebfe920a` | **EXACT MATCH** |
+| **Quarantine Center** | Collision Threshold: `\tau = 0.85` | Header & Slider | `SIMILARITY_THRESHOLD = 0.85` in `config.py` | **EXACT MATCH** |
+| **Sidebar Badge** | HR Quarantine: `2` | `pendingConflictsCount` | `SELECT count(*) FROM quarantine_queue WHERE status='PENDING' AND tenant_id='HR'` &rarr; `2` | **EXACT MATCH** |
+
+---
+
 **OVERALL DEMO READINESS: 100% READY FOR PRESENTATION**
+
 

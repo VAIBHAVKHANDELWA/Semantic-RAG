@@ -22,10 +22,27 @@ interface LineageGraphProps {
 }
 
 export const LineageGraph: React.FC<LineageGraphProps> = ({ conflictId, isModal = false }) => {
-  const { conflicts, selectedConflictId } = useApp();
+  const { conflicts, selectedConflictId, setSelectedConflictId } = useApp();
 
-  const activeConflictId = conflictId || selectedConflictId || 'conf-8901';
-  const conflict = conflicts.find(c => c.id === activeConflictId) || conflicts[0];
+  const [activeId, setActiveId] = useState<string>(conflictId || selectedConflictId || (conflicts[0]?.id ?? ''));
+  const conflict = conflicts.find(c => c.id === activeId) || conflicts[0];
+
+  const [selectedNode, setSelectedNode] = useState<LineageNodeData | null>(null);
+  const [provenanceEdges, setProvenanceEdges] = useState<ProvenanceEdge[]>([]);
+
+  useEffect(() => {
+    if (conflict?.id) {
+      fetchProvenanceEdges(conflict.id)
+        .then(edges => {
+          if (edges && edges.length > 0) {
+            setProvenanceEdges(edges);
+          }
+        })
+        .catch(err => {
+          console.warn('Could not fetch provenance edges for lineage graph:', err);
+        });
+    }
+  }, [conflict?.id]);
 
   if (!conflict) {
     return (
@@ -39,23 +56,10 @@ export const LineageGraph: React.FC<LineageGraphProps> = ({ conflictId, isModal 
     );
   }
 
-  const [selectedNode, setSelectedNode] = useState<LineageNodeData | null>(null);
-  const [provenanceEdges, setProvenanceEdges] = useState<ProvenanceEdge[]>([]);
-
-  useEffect(() => {
-    const targetId = conflict?.id || activeConflictId;
-    if (targetId) {
-      fetchProvenanceEdges(targetId)
-        .then(edges => {
-          if (edges && edges.length > 0) {
-            setProvenanceEdges(edges);
-          }
-        })
-        .catch(err => {
-          console.warn('Could not fetch provenance edges for lineage graph:', err);
-        });
-    }
-  }, [conflict?.id, activeConflictId]);
+  const isOcr = Boolean(
+    conflict?.incomingChunk?.docName?.toLowerCase().includes('scanned') ||
+    conflict?.incomingChunk?.docName?.toLowerCase().includes('ocr')
+  );
 
   // Nodes for the dynamic provenance graph with temporal status styling
   const existingIsArchived = conflict?.status === 'PROMOTED_INCOMING_ARCHIVED_OLD' || conflict?.status === 'ACCEPTED_INCOMING';
@@ -66,57 +70,38 @@ export const LineageGraph: React.FC<LineageGraphProps> = ({ conflictId, isModal 
     {
       id: 'node-root-1',
       type: 'root_doc',
-      title: conflict ? conflict.incomingChunk.docName : 'Global_Remote_Work_Framework_2026.pdf',
-      subtitle: 'Root Document (Native PDF)',
+      title: conflict?.incomingChunk?.docName || 'Enterprise_Policy_Document.pdf',
+      subtitle: isOcr ? 'Root Document (Scanned OCR)' : 'Root Document (Native Tika)',
       status: 'clean',
       metadata: {
-        docName: conflict?.incomingChunk.docName,
-        author: conflict?.incomingChunk.author,
-        uploadDate: conflict?.incomingChunk.uploadDate,
-        effectiveDate: conflict?.incomingChunk.effectiveDate || '2026-09-07',
+        docName: conflict?.incomingChunk?.docName,
+        author: conflict?.incomingChunk?.author || 'Governance Committee',
+        uploadDate: conflict?.incomingChunk?.uploadDate,
+        effectiveDate: conflict?.incomingChunk?.effectiveDate || '2026-09-07',
         temporalStatus: 'Active',
-        tenantScope: conflict?.incomingChunk.tenantId,
-        modality: 'Apache Tika Text Extractor',
-        executionLog: '[00:00.012] Ingested 4.2 MB binary stream\n[00:00.045] PDF structure validated. SHA256 matches.'
-      }
-    },
-    {
-      id: 'node-existing-1',
-      type: 'semantic_chunk',
-      title: existingIsArchived ? `[ARCHIVED] ${conflict?.existingChunk.id}` : `[ACTIVE] ${conflict?.existingChunk.id}`,
-      subtitle: existingIsArchived ? 'Soft-Archived Audit Vault' : 'Live Vector Store Candidate',
-      status: existingIsArchived ? 'pruned' : 'clean',
-      metadata: {
-        docName: conflict?.existingChunk.docName,
-        author: conflict?.existingChunk.author,
-        uploadDate: conflict?.existingChunk.uploadDate,
-        effectiveDate: conflict?.existingChunk.effectiveDate,
-        temporalStatus: existingIsArchived ? 'Archived' : 'Active',
-        tokenCount: conflict?.existingChunk.tokenCount,
-        embeddingId: conflict?.existingChunk.embeddingId,
-        vectorPreview: conflict?.existingChunk.vectorPreview,
-        tenantScope: conflict?.existingChunk.tenantId,
-        executionLog: existingIsArchived 
-          ? '[Status] Soft-Archived for Audit Compliance. Retained in historical vector vault.'
-          : '[Status] Live Active Vector serving production RAG queries.'
+        tenantScope: conflict?.incomingChunk?.tenantId || conflict.department,
+        modality: isOcr ? 'Tesseract OCR Modality' : 'Apache Tika Text Extractor',
+        executionLog: isOcr
+          ? '[Modality] Scanned image detected. Tesseract OCR executed.'
+          : '[Modality] Native structured document. Extracted via Apache Tika 3.x.'
       }
     },
     {
       id: 'node-chunk-1',
       type: 'semantic_chunk',
-      title: `Incoming Chunk #${conflict?.incomingChunk.id || 'chk-14'}`,
+      title: `Incoming Chunk #${conflict?.incomingChunk?.id || 'chk-incoming'}`,
       subtitle: 'MiniLM-L6-v2 Vector (384-dim)',
       status: 'processing',
       metadata: {
-        docName: conflict?.incomingChunk.docName,
-        tokenCount: conflict?.incomingChunk.tokenCount || 262,
-        embeddingId: conflict?.incomingChunk.embeddingId,
-        vectorPreview: conflict?.incomingChunk.vectorPreview || [0.045, -0.188, 0.871, 0.135, -0.41, 0.598],
-        tenantScope: conflict?.incomingChunk.tenantId,
-        uploadDate: conflict?.incomingChunk.uploadDate,
-        effectiveDate: conflict?.incomingChunk.effectiveDate,
+        docName: conflict?.incomingChunk?.docName,
+        tokenCount: conflict?.incomingChunk?.tokenCount || 262,
+        embeddingId: conflict?.incomingChunk?.embeddingId,
+        vectorPreview: conflict?.incomingChunk?.vectorPreview || [0.045, -0.188, 0.871, 0.135, -0.41, 0.598],
+        tenantScope: conflict?.incomingChunk?.tenantId || conflict.department,
+        uploadDate: conflict?.incomingChunk?.uploadDate,
+        effectiveDate: conflict?.incomingChunk?.effectiveDate,
         temporalStatus: incomingIsPromoted ? 'Active' : 'Quarantined',
-        executionLog: '[00:00.240] Tokenized 262 tokens.\n[00:00.310] Generated 384-dim float32 vector embedding.'
+        executionLog: '[Pipeline] Tokenized. Generated 384-dim dense float32 embedding vector.'
       }
     },
     {
@@ -126,25 +111,46 @@ export const LineageGraph: React.FC<LineageGraphProps> = ({ conflictId, isModal 
       subtitle: primaryEdge ? `DB Relation: ${primaryEdge.relation}` : (conflict.status === 'PENDING' ? 'Quarantined Holding Tank' : `Resolved: ${conflict.status}`),
       status: conflict.status === 'PENDING' ? 'quarantined' : 'clean',
       metadata: {
-        docName: conflict?.existingChunk.docName,
+        docName: conflict?.existingChunk?.docName,
         similarity: conflict?.similarityScore,
         tenantScope: conflict?.department,
         temporalStatus: conflict.status === 'PENDING' ? 'Quarantined' : 'Active',
-        executionLog: `[00:00.410] Cosine collision detected (${(conflict.similarityScore * 100).toFixed(1)}%).\n[00:00.430] LLM Verdict: ${conflict.verdictType}.\n[00:00.450] Temporal Status: ${conflict.status}.${primaryEdge ? `\n[DB Provenance Edge] ID: ${primaryEdge.id} | Relation: ${primaryEdge.relation} | Linked: ${primaryEdge.fromChunkId} -> ${primaryEdge.toChunkId}` : ''}`
+        executionLog: `[Adjudication] Cosine similarity: ${(conflict.similarityScore * 100).toFixed(1)}%.\n[Verdict] DeBERTa Cross-Encoder: ${conflict.verdictType}.\n[Status] ${conflict.status}.${primaryEdge ? `\n[Provenance Edge] ${primaryEdge.fromChunkId} -> ${primaryEdge.toChunkId} (${primaryEdge.relation})` : ''}`
+      }
+    },
+    {
+      id: 'node-existing-1',
+      type: 'semantic_chunk',
+      title: existingIsArchived ? `[ARCHIVED] ${conflict?.existingChunk?.id}` : `[ACTIVE] ${conflict?.existingChunk?.id}`,
+      subtitle: existingIsArchived ? 'Soft-Archived Audit Vault' : 'Live Vector Store Candidate',
+      status: existingIsArchived ? 'pruned' : 'clean',
+      metadata: {
+        docName: conflict?.existingChunk?.docName,
+        author: conflict?.existingChunk?.author,
+        uploadDate: conflict?.existingChunk?.uploadDate,
+        effectiveDate: conflict?.existingChunk?.effectiveDate,
+        temporalStatus: existingIsArchived ? 'Archived' : 'Active',
+        tokenCount: conflict?.existingChunk?.tokenCount,
+        embeddingId: conflict?.existingChunk?.embeddingId,
+        vectorPreview: conflict?.existingChunk?.vectorPreview,
+        tenantScope: conflict?.existingChunk?.tenantId,
+        executionLog: existingIsArchived 
+          ? '[Status] Soft-Archived for Audit Compliance. Retained in historical vector vault.'
+          : '[Status] Live Active Vector serving production RAG queries.'
       }
     },
     {
       id: 'node-vector-db',
       type: 'vector_db',
-      title: 'Vector DB Index: b2b_policies',
-      subtitle: 'pgvector 384-dim Isolated Namespace',
+      title: `pgvector Index: ${conflict.department.toLowerCase()}`,
+      subtitle: 'PostgreSQL HNSW 384-dim Isolated Namespace',
       status: conflict.status === 'PENDING' ? 'quarantined' : 'clean',
       metadata: {
-        docName: 'b2b_policies_vector_v4',
+        docName: 'idx_vector_chunks_hnsw',
         tenantScope: conflict?.department,
         temporalStatus: incomingIsPromoted ? 'Active' : 'Quarantined',
-        embeddingId: incomingIsPromoted ? conflict.incomingChunk.embeddingId : conflict.existingChunk.embeddingId,
-        executionLog: `[Status] ${conflict.status === 'PENDING' ? 'Quarantine Holding Tank' : 'Committed with Provenance Metadata Tag'}`
+        embeddingId: incomingIsPromoted ? conflict.incomingChunk?.embeddingId : conflict.existingChunk?.embeddingId,
+        executionLog: `[Status] ${conflict.status === 'PENDING' ? 'Quarantine Holding Tank (Excluded from RAG)' : 'Committed with Provenance Metadata Tag'}`
       }
     }
   ];
@@ -190,12 +196,33 @@ export const LineageGraph: React.FC<LineageGraphProps> = ({ conflictId, isModal 
               Interactive Data Lineage & Traceability Graph
             </h2>
             <p className="text-xs text-slate-400 mt-1">
-              Tracing document ingestion provenance: Raw File → OCR Parser → MiniLM Chunk → Cosine Conflict → Vector Store.
+              Tracing document ingestion provenance: Raw File &rarr; {isOcr ? 'Tesseract OCR' : 'Apache Tika'} &rarr; MiniLM Chunk &rarr; DeBERTa Adjudication &rarr; PostgreSQL pgvector.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-mono text-cyan-400 bg-slate-900/90 px-3 py-1.5 rounded-xl border border-slate-800">
-            <Info className="w-4 h-4 text-cyan-400" /> Click any graph node to inspect raw vector metadata
+          <div className="flex items-center gap-3">
+            {conflicts.length > 0 && (
+              <div className="flex items-center gap-2 text-xs font-mono">
+                <span className="text-slate-400">Select Document Pair:</span>
+                <select
+                  value={activeId}
+                  onChange={e => {
+                    setActiveId(e.target.value);
+                    setSelectedConflictId(e.target.value);
+                  }}
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-slate-200 text-xs focus:outline-none focus:border-cyan-400 max-w-xs truncate"
+                >
+                  {conflicts.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.incomingChunk?.docName || c.id} ({c.status})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-cyan-400 bg-slate-900/90 px-3 py-1.5 rounded-xl border border-slate-800">
+              <Info className="w-4 h-4 text-cyan-400" /> Click any node to inspect metadata
+            </div>
           </div>
         </div>
       )}
@@ -263,10 +290,13 @@ export const LineageGraph: React.FC<LineageGraphProps> = ({ conflictId, isModal 
         <div className="relative z-10 pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between text-xs text-slate-400 font-mono">
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-400" /> Root File</span>
-            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-purple-400" /> OCR Parser</span>
+            {isOcr && (
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-purple-400" /> OCR Parser</span>
+            )}
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-cyan-400" /> MiniLM Vector</span>
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-400" /> Conflict Quarantined</span>
-            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400" /> Vector DB</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-400" /> Archived / Superseded</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400" /> Active Vector DB</span>
           </div>
 
           <div>

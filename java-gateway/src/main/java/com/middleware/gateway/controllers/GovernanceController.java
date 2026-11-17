@@ -98,7 +98,7 @@ public class GovernanceController {
      * Returns compliance audit log history for the tenant.
      */
     @GetMapping("/audit/logs")
-    @PreAuthorize("hasAnyRole('COMPLIANCE_AUDITOR', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('COMPLIANCE_AUDITOR', 'SYSTEM_ADMIN', 'DATA_STEWARD')")
     public ResponseEntity<List<ComplianceAuditLog>> getAuditLogs(Authentication authentication) {
         String tenantId = extractTenant(authentication);
         return ResponseEntity.ok(governanceService.getAuditLogs(tenantId));
@@ -109,7 +109,7 @@ public class GovernanceController {
      * Recomputes and verifies the cryptographic SHA-256 integrity hash chain.
      */
     @GetMapping("/audit/verify")
-    @PreAuthorize("hasAnyRole('COMPLIANCE_AUDITOR', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('COMPLIANCE_AUDITOR', 'SYSTEM_ADMIN', 'DATA_STEWARD')")
     public ResponseEntity<Map<String, Object>> verifyAuditChain(Authentication authentication) {
         String tenantId = extractTenant(authentication);
         return ResponseEntity.ok(governanceService.verifyAuditChain(tenantId));
@@ -168,6 +168,27 @@ public class GovernanceController {
     ) {
         String tenantId = extractTenant(authentication);
         return ResponseEntity.ok(vectorChunkRepository.findByDocumentIdAndTenantIdOrderByChunkIndexAsc(id, tenantId));
+    }
+
+    /**
+     * Endpoint 10: GET /api/v1/chunks/archived
+     * Retrieves real soft-archived / superseded vector chunks for the tenant.
+     */
+    @GetMapping("/chunks/archived")
+    @PreAuthorize("hasAnyRole('DATA_STEWARD', 'SYSTEM_ADMIN', 'COMPLIANCE_AUDITOR')")
+    public ResponseEntity<List<VectorChunk>> getArchivedChunks(Authentication authentication) {
+        String tenantId = extractTenant(authentication);
+        String role = extractRole(authentication);
+        if ("SYSTEM_ADMIN".equalsIgnoreCase(role) && "GLOBAL".equalsIgnoreCase(tenantId)) {
+            return ResponseEntity.ok(vectorChunkRepository.findAll().stream()
+                    .filter(c -> "ARCHIVED".equalsIgnoreCase(c.getStatus()) || "SUPERSEDED".equalsIgnoreCase(c.getStatus()))
+                    .toList());
+        }
+        List<VectorChunk> archived = vectorChunkRepository.findByTenantIdAndStatusOrderByCreatedAtDesc(tenantId, "ARCHIVED");
+        List<VectorChunk> superseded = vectorChunkRepository.findByTenantIdAndStatusOrderByCreatedAtDesc(tenantId, "SUPERSEDED");
+        List<VectorChunk> combined = new java.util.ArrayList<>(archived);
+        combined.addAll(superseded);
+        return ResponseEntity.ok(combined);
     }
 
     private String extractTenant(Authentication authentication) {

@@ -37,15 +37,16 @@ export const QuarantineCenter: React.FC = () => {
 
   // Filter conflicts based on Tenant, Similarity threshold, Status, and Search
   const filteredConflicts = conflicts.filter(c => {
-    if (selectedTenant !== 'ALL' && c.department !== selectedTenant) return false;
+    const dept = c.department || c.tenantId;
+    if (selectedTenant !== 'ALL' && dept !== selectedTenant) return false;
     if (c.similarityScore < minSimilarity) return false;
     if (statusFilter === 'PENDING' && c.status !== 'PENDING') return false;
     if (statusFilter === 'RESOLVED' && c.status === 'PENDING') return false;
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      const matchDocA = c.existingChunk.docName.toLowerCase().includes(query);
-      const matchDocB = c.incomingChunk.docName.toLowerCase().includes(query);
-      const matchExp = c.contradictionExplanation.toLowerCase().includes(query);
+      const matchDocA = (c.existingChunk?.docName || '').toLowerCase().includes(query);
+      const matchDocB = (c.incomingChunk?.docName || '').toLowerCase().includes(query);
+      const matchExp = (c.contradictionExplanation || '').toLowerCase().includes(query);
       if (!matchDocA && !matchDocB && !matchExp) return false;
     }
     return true;
@@ -76,7 +77,7 @@ export const QuarantineCenter: React.FC = () => {
             Human-in-the-Loop Quarantine Resolution Center
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Reviewing semantic collisions flagged by MiniLM vector comparison (85%–97% cosine similarity range).
+            Reviewing semantic collisions flagged by pgvector & DeBERTa Cross-Encoder (threshold &tau; = 0.85).
           </p>
         </div>
 
@@ -101,11 +102,11 @@ export const QuarantineCenter: React.FC = () => {
 
           {/* Similarity Slider */}
           <div className="flex items-center gap-2 px-2">
-            <span className="text-slate-400 font-mono text-[11px]">Similarity: &gt;{(minSimilarity * 100).toFixed(0)}%</span>
+            <span className="text-slate-400 font-mono text-[11px]">Similarity: &ge;{(minSimilarity * 100).toFixed(0)}%</span>
             <input 
               type="range"
-              min="0.80"
-              max="0.95"
+              min="0.85"
+              max="0.99"
               step="0.01"
               value={minSimilarity}
               onChange={e => setMinSimilarity(parseFloat(e.target.value))}

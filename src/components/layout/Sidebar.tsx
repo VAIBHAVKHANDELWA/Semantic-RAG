@@ -20,7 +20,7 @@ import {
 import { useApp } from '../../context/AppContext';
 
 export const Sidebar: React.FC = () => {
-  const { activeView, setActiveView, conflicts, selectedTenant, tenants, user, setRoleDebug } = useApp();
+  const { activeView, setActiveView, conflicts, selectedTenant, tenants, user } = useApp();
   const [collapsed, setCollapsed] = useState(false);
 
   const pendingConflictsCount = conflicts.filter(c => c.status === 'PENDING').length;
@@ -224,42 +224,6 @@ export const Sidebar: React.FC = () => {
               </div>
               <div className="mt-1 text-[10px] text-slate-400 font-mono truncate">
                 {selectedTenant === 'ALL' ? 'Global Multi-Tenant' : currentTenantObj?.isolationLevel}
-              </div>
-            </div>
-
-            {/* Quick Debug Switcher for Effortless Persona Testing */}
-            <div className="pt-1">
-              <div className="text-[9px] font-mono text-slate-500 uppercase tracking-wider mb-1 px-1">
-                Debug Switch Persona:
-              </div>
-              <div className="grid grid-cols-3 gap-1 text-[9px] font-mono font-bold">
-                <button
-                  onClick={() => setRoleDebug('DATA_STEWARD')}
-                  className={`py-1 rounded border transition-colors ${
-                    user?.role === 'DATA_STEWARD' ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50' : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
-                  }`}
-                  title="Switch to Data Steward"
-                >
-                  STEWARD
-                </button>
-                <button
-                  onClick={() => setRoleDebug('SYSTEM_ADMIN')}
-                  className={`py-1 rounded border transition-colors ${
-                    user?.role === 'SYSTEM_ADMIN' ? 'bg-amber-500/20 text-amber-300 border-amber-500/50' : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
-                  }`}
-                  title="Switch to System Admin"
-                >
-                  ADMIN
-                </button>
-                <button
-                  onClick={() => setRoleDebug('COMPLIANCE_AUDITOR')}
-                  className={`py-1 rounded border transition-colors ${
-                    user?.role === 'COMPLIANCE_AUDITOR' ? 'bg-purple-500/20 text-purple-300 border-purple-500/50' : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
-                  }`}
-                  title="Switch to Compliance Auditor"
-                >
-                  AUDITOR
-                </button>
               </div>
             </div>
           </>

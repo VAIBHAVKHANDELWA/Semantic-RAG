@@ -1,6 +1,10 @@
 import os
 from dotenv import load_dotenv
 
+# Enforce offline mode for Hugging Face and Transformers to prevent network retries
+os.environ["HF_HUB_OFFLINE"] = "1"
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+
 # Load .env file
 load_dotenv()
 

@@ -42,11 +42,20 @@ app = FastAPI(
 
 @app.get("/health")
 def health_check():
-    """Public health check endpoint."""
+    """Public health check endpoint with real runtime device detection."""
+    device = "CPU"
+    try:
+        import torch
+        if torch.cuda.is_available():
+            device = f"CUDA ({torch.cuda.get_device_name(0)})"
+    except Exception:
+        pass
     return {
         "status": "healthy",
         "service": "python-ai-engine",
         "model": "all-MiniLM-L6-v2",
+        "adjudicator_model": "cross-encoder/nli-deberta-v3-xsmall",
+        "device": device,
         "vector_dimensions": 384
     }
 

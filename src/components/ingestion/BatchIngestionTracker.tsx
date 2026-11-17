@@ -18,7 +18,7 @@ export const BatchIngestionTracker: React.FC = () => {
 
   const filteredJobs = selectedTenant === 'ALL'
     ? batchJobs
-    : batchJobs.filter(j => j.department === selectedTenant);
+    : batchJobs.filter(j => (j.department || (j as any).tenantId) === selectedTenant);
 
   return (
     <div className="space-y-6 font-sans">
@@ -132,13 +132,13 @@ export const BatchIngestionTracker: React.FC = () => {
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/80">
-                  <div className="text-[10px] text-slate-500">Throughput</div>
-                  <div className="text-base font-bold text-purple-300 mt-0.5">{job.throughputChunksPerSec} / sec</div>
+                  <div className="text-[10px] text-slate-500">Pipeline Status</div>
+                  <div className="text-base font-bold text-purple-300 mt-0.5 truncate">{job.status.replace(/_/g, ' ')}</div>
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/80">
-                  <div className="text-[10px] text-slate-500">Est. Time Remaining</div>
-                  <div className="text-base font-bold text-emerald-300 mt-0.5">{job.estimatedTimeRemaining}</div>
+                  <div className="text-[10px] text-slate-500">Job Timestamp</div>
+                  <div className="text-base font-bold text-emerald-300 mt-0.5">{job.createdAt ? job.createdAt.slice(11, 19) : 'Live'}</div>
                 </div>
               </div>
             </GlassCard>

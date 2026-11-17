@@ -168,8 +168,8 @@ export const DirectToCloudModal: React.FC<DirectToCloudModalProps> = ({ isOpen, 
               </span>
             </div>
 
-            <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-[11px] text-amber-300 break-all select-all">
-              {activeTicket.presignedUrl}
+            <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-[11px] text-amber-300 break-all select-all font-mono">
+              {activeTicket.presignedUrl.replace(/X-Amz-Signature=[a-f0-9]+/i, 'X-Amz-Signature=***redacted***')}
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-400">

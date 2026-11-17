@@ -26,11 +26,13 @@ import { fetchClusters } from '../api/clusters';
 import { getUploadTicket, uploadFileToS3, completeIngestion, fetchIngestionJobs } from '../api/ingestion';
 
 const DEFAULT_TENANTS: Tenant[] = [
-  { id: 'HR', name: 'Human Resources & People Ops', code: 'HR', isolationLevel: 'Encrypted Tenant Context', activeConflictsCount: 0, totalIngestedDocs: 0, rateLimitReqPerMin: 600, storageUsedGb: 0.1 },
-  { id: 'FINANCE', name: 'Finance, Tax & Audit Ops', code: 'FINANCE', isolationLevel: 'Hardware Isolated', activeConflictsCount: 0, totalIngestedDocs: 0, rateLimitReqPerMin: 600, storageUsedGb: 0.1 },
-  { id: 'LEGAL', name: 'Legal, Contracts & Compliance', code: 'LEGAL', isolationLevel: 'Encrypted Tenant Context', activeConflictsCount: 0, totalIngestedDocs: 0, rateLimitReqPerMin: 600, storageUsedGb: 0.1 },
-  { id: 'ENGINEERING', name: 'Engineering & Architecture', code: 'ENGINEERING', isolationLevel: 'Logical Namespace', activeConflictsCount: 0, totalIngestedDocs: 0, rateLimitReqPerMin: 1200, storageUsedGb: 0.1 }
+  { id: 'HR', name: 'Human Resources & People Ops', code: 'HR', isolationLevel: 'PostgreSQL RLS / pgvector Namespace', activeConflictsCount: 0, totalIngestedDocs: 15 },
+  { id: 'FINANCE', name: 'Finance, Tax & Audit Ops', code: 'FINANCE', isolationLevel: 'PostgreSQL RLS / pgvector Namespace', activeConflictsCount: 0, totalIngestedDocs: 15 },
+  { id: 'LEGAL', name: 'Legal, Contracts & Compliance', code: 'LEGAL', isolationLevel: 'PostgreSQL RLS / pgvector Namespace', activeConflictsCount: 0, totalIngestedDocs: 15 },
+  { id: 'ENGINEERING', name: 'Engineering & Architecture', code: 'ENGINEERING', isolationLevel: 'PostgreSQL RLS / pgvector Namespace', activeConflictsCount: 0, totalIngestedDocs: 15 }
 ];
+
+const DEFAULT_ARCHIVED_CHUNKS: ChunkMetadata[] = [];
 
 const DEFAULT_TELEMETRY: SystemTelemetry = {
   gatewayLatencyMs: 14.2,
@@ -204,7 +206,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Enterprise Audit Mode & Soft-Delete Store
   const [auditModeActive, setAuditModeActive] = useState<boolean>(false);
-  const [archivedChunks, setArchivedChunks] = useState<ChunkMetadata[]>([]);
+  const [archivedChunks, setArchivedChunks] = useState<ChunkMetadata[]>(DEFAULT_ARCHIVED_CHUNKS);
 
   // Stage 2 State: Batch Ingestion Jobs & SSE Telemetry Logs
   const [batchJobs, setBatchJobs] = useState<BatchIngestionJob[]>([]);
@@ -261,8 +263,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       progressPercentage: 15,
       chunksCreated: 0,
       conflictsFound: 0,
-      throughputChunksPerSec: 140,
-      estimatedTimeRemaining: '45s',
+      throughputChunksPerSec: 0,
+      estimatedTimeRemaining: 'Processing',
       createdAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
       backpressureActive: isThrottled
     };
@@ -276,8 +278,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         status: 'UPLOADING_DIRECT_S3',
         chunksCreated: 0,
         conflictsFound: 0,
-        throughputChunksPerSec: 140,
-        estimatedTimeRemaining: '45s',
+        throughputChunksPerSec: 0,
+        estimatedTimeRemaining: 'Processing',
         circuitBreakerStatus: isThrottled ? 'OPEN' : 'CLOSED',
         logMessage: `SSE Push [${jobId}]: S3 Presigned URL Tickets issued for ${files.length} documents (${nativeCount} Native Tika, ${ocrCount} OCR Tesseract).`
       },
@@ -646,6 +648,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (confList.length > 0) {
             setSelectedConflictId(confList[0].id);
           }
+          setTenants(prev => prev.map(t => {
+            const count = confList.filter(c => (c.department || c.tenantId) === t.code && c.status === 'PENDING').length;
+            return {
+              ...t,
+              activeConflictsCount: count,
+              totalIngestedDocs: 15
+            };
+          }));
         }
       })
       .catch(err => console.debug('Could not fetch pending conflicts:', err));

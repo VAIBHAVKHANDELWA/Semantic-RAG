@@ -8,21 +8,25 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { GlassCard } from '../common/GlassCard';
-import type { TenantScope, Tenant } from '../../types';
+import type { TenantScope } from '../../types';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const TenantManagementView: React.FC = () => {
-  const { tenants, addTenant, updateTenantRateLimit } = useApp();
+  const { tenants, addTenant, updateTenantRateLimit, user } = useApp();
   const [modalOpen, setModalOpen] = useState(false);
   const [tenantName, setTenantName] = useState('');
   const [tenantCode, setTenantCode] = useState<TenantScope>('ENGINEERING');
-  const [isolationLevel, setIsolationLevel] = useState<Tenant['isolationLevel']>('Hardware Isolated');
+  const [isolationLevel, setIsolationLevel] = useState<string>('PostgreSQL RLS / pgvector Namespace');
   const [rateLimit, setRateLimit] = useState(600);
+
+  const visibleTenants = user?.role === 'SYSTEM_ADMIN' 
+    ? tenants 
+    : tenants.filter(t => t.code === user?.tenant);
 
   const handleSubmitNewTenant = (e: React.FormEvent) => {
     e.preventDefault();
     if (tenantName.trim()) {
-      addTenant(tenantName.trim(), tenantCode, isolationLevel, rateLimit);
+      addTenant(tenantName.trim(), tenantCode, isolationLevel as any, rateLimit);
       setTenantName('');
       setModalOpen(false);
     }
@@ -61,7 +65,7 @@ export const TenantManagementView: React.FC = () => {
 
       {/* Active Tenants Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {tenants.map(t => (
+        {visibleTenants.map(t => (
           <GlassCard key={t.id} glowColor="cyan" className="space-y-4 relative">
             <div className="flex items-start justify-between">
               <div>
@@ -78,7 +82,7 @@ export const TenantManagementView: React.FC = () => {
             <div className="space-y-2 pt-2 border-t border-slate-800 text-xs font-mono">
               <div className="flex justify-between text-slate-400">
                 <span>Isolation Level:</span>
-                <span className="text-slate-200 font-bold">{t.isolationLevel}</span>
+                <span className="text-slate-200 font-bold">PostgreSQL RLS / pgvector Namespace</span>
               </div>
               <div className="flex justify-between text-slate-400">
                 <span>Ingested Docs:</span>
@@ -89,10 +93,6 @@ export const TenantManagementView: React.FC = () => {
                 <span className={`font-bold ${t.activeConflictsCount > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
                   {t.activeConflictsCount} pending
                 </span>
-              </div>
-              <div className="flex justify-between text-slate-400">
-                <span>Storage Used:</span>
-                <span className="text-purple-300 font-bold">{t.storageUsedGb || 12.4} GB</span>
               </div>
             </div>
 
@@ -176,9 +176,8 @@ export const TenantManagementView: React.FC = () => {
                       onChange={e => setIsolationLevel(e.target.value as any)}
                       className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-slate-100 focus:outline-none focus:border-amber-400"
                     >
-                      <option value="Hardware Isolated">Hardware Isolated</option>
-                      <option value="Logical Namespace">Logical Namespace</option>
-                      <option value="Encrypted Tenant Context">Encrypted Tenant Context</option>
+                      <option value="PostgreSQL RLS / pgvector Namespace">PostgreSQL RLS / pgvector Namespace</option>
+                      <option value="Schema Isolated">Schema Isolated</option>
                     </select>
                   </div>
                 </div>
