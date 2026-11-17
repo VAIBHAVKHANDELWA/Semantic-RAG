@@ -18,15 +18,27 @@ USERS = {
     "ENGINEERING": ("eng_steward@enterprise.com", "password123")
 }
 
-FILES = [
-    ("HR", os.path.join(ROOT_DIR, "demo-data", "hr", "HR_Policy_Baseline.txt")),
-    ("HR", os.path.join(ROOT_DIR, "demo-data", "hr", "HR_Policy_2026_Update.txt")),
-    ("FINANCE", os.path.join(ROOT_DIR, "demo-data", "finance", "Finance_Policy_Baseline.txt")),
-    ("FINANCE", os.path.join(ROOT_DIR, "demo-data", "finance", "Finance_Policy_2026_Update.txt")),
-    ("ENGINEERING", os.path.join(ROOT_DIR, "demo-data", "engineering", "Engineering_Architecture_Playbook.txt")),
-    ("LEGAL", os.path.join(ROOT_DIR, "demo-data", "legal", "Legal_Compliance_Baseline.txt")),
-    ("LEGAL", os.path.join(ROOT_DIR, "demo-data", "legal", "Legal_Compliance_2026_Update.txt"))
-]
+# Check if user requested full 60-document enterprise dataset
+USE_FULL_DATASET = "--full" in sys.argv or "-FullCorpus" in sys.argv
+
+if USE_FULL_DATASET:
+    DATASET_DIR = os.path.join(ROOT_DIR, "demo-data", "enterprise_dataset")
+    FILES = []
+    for tenant in ["HR", "FINANCE", "LEGAL", "ENGINEERING"]:
+        t_dir = os.path.join(DATASET_DIR, tenant)
+        if os.path.exists(t_dir):
+            for fn in sorted(os.listdir(t_dir)):
+                FILES.append((tenant, os.path.join(t_dir, fn)))
+else:
+    FILES = [
+        ("HR", os.path.join(ROOT_DIR, "demo-data", "hr", "HR_Policy_Baseline.txt")),
+        ("HR", os.path.join(ROOT_DIR, "demo-data", "hr", "HR_Policy_2026_Update.txt")),
+        ("FINANCE", os.path.join(ROOT_DIR, "demo-data", "finance", "Finance_Policy_Baseline.txt")),
+        ("FINANCE", os.path.join(ROOT_DIR, "demo-data", "finance", "Finance_Policy_2026_Update.txt")),
+        ("ENGINEERING", os.path.join(ROOT_DIR, "demo-data", "engineering", "Engineering_Architecture_Playbook.txt")),
+        ("LEGAL", os.path.join(ROOT_DIR, "demo-data", "legal", "Legal_Compliance_Baseline.txt")),
+        ("LEGAL", os.path.join(ROOT_DIR, "demo-data", "legal", "Legal_Compliance_2026_Update.txt"))
+    ]
 
 print("=" * 65)
 print(" ENTERPRISE SEMANTIC-RAG PLATFORM — DEMO DATA LOADER")

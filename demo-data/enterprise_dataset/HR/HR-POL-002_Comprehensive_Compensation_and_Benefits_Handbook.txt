@@ -1,0 +1,347 @@
+# ENTERPRISE GOVERNANCE POLICY MANUAL
+# Document ID: HR-POL-002-HR-2025-v3.2
+# Operational Department: HR
+# Canonical Title: Enterprise Total Rewards, Merit Bands & Executive Compensation
+# Classification: CONFIDENTIAL — STRICTLY INTERNAL GOVERNANCE ONLY
+# Effective Date: January 15, 2025 | Next Mandatory Sunset Review: January 14, 2027
+# Primary Document Owner: Office of the Chief Hr Officer
+# Executive Sponsor: Enterprise Executive Governance and Risk Council
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+1.  EXECUTIVE SUMMARY AND STRATEGIC PURPOSE
+2.  STATUTORY, REGULATORY, AND COMPLIANCE BASELINE
+3.  ENTERPRISE APPLICABILITY AND JURISDICTIONAL SCOPE
+4.  CANONICAL DEFINITIONS AND INTERPRETATIVE RULES
+5.  ORGANIZATIONAL ROLES AND DELEGATED AUTHORITY MATRIX
+6.  PRIMARY POLICY PRINCIPLES AND MANDATORY OPERATING RULES
+7.  DETAILED OPERATIONAL PROCEDURES AND WORKFLOW PATHWAYS
+8.  RISK MANAGEMENT, CONTROLS, AND FRAUD MITIGATION
+9.  DATA GOVERNANCE, AUDIT TRAIL, AND RETENTION DIRECTIVES
+10. INTER-DEPARTMENTAL DEPENDENCIES AND CROSS-FUNCTIONAL PROTOCOLS
+11. METRICS, KEY PERFORMANCE INDICATORS (KPIS), AND REPORTING
+12. EXCEPTION MANAGEMENT, ESCALATION, AND WAIVER PROTOCOL
+13. ENFORCEMENT, PENALTIES, AND DISCIPLINARY SANCTIONS
+14. REVISION HISTORY AND RECORD OF PAST RATIFICATIONS
+15. APPENDIX A: OPERATIONAL STEP-BY-STEP CHECKLIST
+16. APPENDIX B: STATUTORY CITATIONS AND REGULATORY MAPPINGS
+
+================================================================================
+SECTION 1: EXECUTIVE SUMMARY AND STRATEGIC PURPOSE
+================================================================================
+1.1 Strategic Rationale
+The Board of Directors and the Executive Governance Committee of Global Enterprise
+Technologies Corporation hereby establish this operational standard governing
+Enterprise Total Rewards, Merit Bands & Executive Compensation. In an increasingly distributed, multi-jurisdictional operating environment,
+inconsistent departmental execution creates enterprise-wide legal vulnerabilities,
+operational latency, financial penalties, and reputational risk.
+
+1.2 Primary Governance Objectives
+The objectives set forth within this standard are immutable across all operating units:
+(a) To enforce rigorous, repeatable, auditable controls compliant with global regulations;
+(b) To clearly delineate executive and managerial lines of accountability;
+(c) To protect corporate assets, intellectual property, personnel well-being, and shareholder value;
+(d) To optimize operating velocity while sustaining zero-trust security postures;
+(e) To ensure seamless integration with the Enterprise Semantic RAG Platform and automated compliance engines.
+
+1.3 Executive Endorsement and Mandatory Adherence
+This manual has been reviewed and ratified by the Chief Operating Officer, Chief Legal Officer,
+Chief Financial Officer, and Chief Information Security Officer. Adherence to every mandate
+articulated herein is mandatory for all personnel, vendors, contractors, and affiliates.
+
+================================================================================
+SECTION 2: STATUTORY, REGULATORY, AND COMPLIANCE BASELINE
+================================================================================
+2.1 Global Regulatory Alignment
+This operational manual incorporates compliance mandates derived from prevailing statutory frameworks,
+including but not limited to:
+- United States Federal Standards: Sarbanes-Oxley Act of 2002 (SOX Sections 302, 404, 802);
+- United States Securities Regulations: Securities Exchange Act of 1934 (Rules 10b-5, 13a-14, 17a-4);
+- International Privacy and Consumer Protection: General Data Protection Regulation (EU) 2016/679 (GDPR),
+  California Consumer Privacy Act as amended by the CPRA (Cal. Civ. Code §§ 1798.100 et seq.);
+- Enterprise Security and Reliability: National Institute of Standards and Technology (NIST SP 800-53 Rev 5,
+  NIST Cybersecurity Framework CSF 2.0), ISO/IEC 27001:2022, and AICPA SOC 2 Type II trust principles;
+- Department-Specific Regulations: Specific statutory codifications applicable to HR operations across
+  North American, European Union, and Asia-Pacific regional operating centers.
+
+2.2 Supremacy of Local Mandatory Law
+Where provisions of this manual establish stricter standards than local regional law, the provisions
+of this manual shall govern. In circumstances where local regional law imposes mandatory statutory obligations
+that conflict directly with this manual, local law shall take precedence solely within that specific
+geographic jurisdiction, subject to immediate notification to the Office of General Counsel.
+
+================================================================================
+SECTION 3: ENTERPRISE APPLICABILITY AND JURISDICTIONAL SCOPE
+================================================================================
+3.1 Universal Enterprise Scope
+This policy applies comprehensively to all worldwide corporate divisions, operating subsidiaries, joint
+ventures in which the Corporation exercises voting majority, and operational units of the HR Department.
+
+3.2 Covered Personnel
+The mandates, reporting duties, and prohibitions detailed herein apply without exception to:
+(a) Regular full-time salaried and hourly employees;
+(b) Executive leadership and officers of the corporation;
+(c) Temporary, contract, and outsourced agency personnel operating within enterprise facilities or networks;
+(d) Third-party service providers, independent contractors, and advisory consultants during their engagement term.
+
+3.3 Multi-Tenant Cloud and Logical Partitioning
+Within the Enterprise Semantic RAG architecture, all artifacts, documents, vector embeddings, and audit trails
+generated pursuant to this policy must be logically and cryptographically partitioned under the
+dedicated tenant identifier `HR`. Cross-tenant leakage is strictly prevented by software-enforced RBAC.
+
+================================================================================
+SECTION 4: CANONICAL DEFINITIONS AND INTERPRETATIVE RULES
+================================================================================
+For the purposes of this governance standard, the following canonical definitions shall apply:
+4.1 "Active Artifact" — Any operational record, policy clause, vector chunk, or data object currently authorized
+    for retrieval, general access, or computational indexing within the live production platform.
+4.2 "Archived Artifact" — A superseded or retired policy clause retained in immutable storage strictly for statutory
+    auditing, regulatory inquiries, or legal discovery pursuant to SEC Rule 17a-4.
+4.3 "Delegated Authority" — The formal written authorization empowering a specific corporate officer or manager
+    to commit enterprise financial expenditure, execute binding contracts, or approve operational waivers.
+4.4 "Direct-to-Cloud Stream" — An asynchronous data transfer pipeline wherein client software uploads binary objects
+    directly to cryptographically secured S3-compatible object storage via presigned URLs without gateway buffering.
+4.5 "Enterprise Knowledge Base" — The unified relational and vector database repository storing validated institutional
+    policies, standard operating procedures, architecture blueprints, and regulatory guidelines.
+4.6 "Governance Council" — The multi-disciplinary executive committee tasked with adjudicating cross-departmental policy
+    disputes, reviewing high-impact audit findings, and evaluating quarterly compliance posture.
+4.7 "Material Non-Compliance" — Any willful, negligent, or systematic failure to execute mandatory controls that results
+    in financial loss exceeding $25,000, unauthorized exposure of confidential data, or regulatory sanctions.
+4.8 "Provenance DAG" — The directed acyclic graph capturing the end-to-end lineage of every data chunk from source document
+    ingestion, through vectorization and semantic collision evaluation, to final human resolution.
+4.9 "Quarantine Repository" — The secure staging environment where contradictory, corrupted, or unvalidated policy
+    proposals are isolated pending human-in-the-loop review by designated Data Stewards.
+4.10 "Zero-Trust Isolation" — The cybersecurity architecture ensuring that every request, regardless of origin,
+     is authenticated, authorized against role and tenant boundaries, and cryptographically verified.
+
+================================================================================
+SECTION 5: ORGANIZATIONAL ROLES AND DELEGATED AUTHORITY MATRIX
+================================================================================
+5.1 Hierarchy of Responsibility
+Governance of Enterprise Total Rewards, Merit Bands & Executive Compensation is distributed across four distinct operating tiers:
+- Tier 1: Executive Oversight (Chief Hr Officer & Audit Committee)
+  Maintains strategic oversight, approves policy revisions, and reports annually to the Board of Directors.
+- Tier 2: Governance Direction (Department Vice Presidents & Directors)
+  Ensures departmental adherence, allocates operational budgets, and reviews quarterly compliance telemetry.
+- Tier 3: Operational Execution (Designated Data Stewards & Operations Leads)
+  Executes daily administrative tasks, supervises document lifecycles, and resolves quarantine collisions.
+- Tier 4: Independent Assurance (Compliance Auditors & Internal Audit Team)
+  Executes unannounced inspections, verifies cryptographic audit hash chains, and produces formal audit reports.
+
+5.2 Delegated Authority Matrix
+The following thresholds govern formal approvals under this standard:
+-----------------------------------------------------------------------------------------------------------------
+Transaction / Decision Type          | Operational Lead   | Department Director | Department VP | Chief Executive
+-----------------------------------------------------------------------------------------------------------------
+Routine Operational Approvals        | Up to $1,000       | Up to $10,000       | Up to $50,000 | Over $50,000
+Policy Exception Waivers (< 30 days) | Not Permitted      | Permitted (Level 1) | Permitted (L2)| Mandatory Sign-off
+Policy Exception Waivers (> 30 days) | Not Permitted      | Not Permitted       | Permitted (L3)| Mandatory Sign-off
+Resolution of Semantic Collisions    | Data Steward Only  | Review Authority    | Escalation    | Final Appeal
+Vendor Contract Execution            | Not Permitted      | Up to $25,000       | Up to $100,000| Over $100,000
+-----------------------------------------------------------------------------------------------------------------
+
+================================================================================
+SECTION 6: PRIMARY POLICY PRINCIPLES AND MANDATORY OPERATING RULES
+================================================================================
+6.1 Principle of Proactive Compliance
+Every operational process within the HR Department must incorporate compliance checkpoints by design.
+Retroactive or post-hoc validation is considered a control deficiency.
+
+6.2 Principle of Least Privilege and Segregation of Duties
+No single employee shall possess the authority to initiate, approve, execute, and reconcile any transaction
+or operational update under this policy. Critical operations require dual-person verification.
+
+6.3 Principle of Continuous Knowledge Verification
+All institutional documentation supporting Enterprise Total Rewards, Merit Bands & Executive Compensation must be maintained in the corporate vector repository.
+When revisions are proposed, they must undergo automated semantic similarity comparison against active
+rules to prevent organizational drift, contradictory instructions, or operational paralysis.
+
+6.4 Mandatory Rule of Immediate Disclosure
+Any employee who becomes aware of an emerging conflict, operational defect, or regulatory breach must disclose
+the event through formal internal channels within twenty-four (24) business hours.
+
+================================================================================
+SECTION 7: DETAILED OPERATIONAL PROCEDURES AND WORKFLOW PATHWAYS
+================================================================================
+7.1 Phase I: Document Initiation and Pre-Review
+1. Originating managers author proposed revisions in standard enterprise templates.
+2. The author must execute automated metadata tagging specifying Department (HR), Target Audience,
+   Statutory Citations, and Effective Sunset Date.
+3. The drafting committee conducts peer review with at least two senior subject matter experts.
+
+7.2 Phase II: Automated Direct-to-Cloud Ingestion
+1. The author requests an AWS S3 Presigned Upload Ticket from the Java Gateway API (`/api/v1/ingest/upload-ticket`).
+2. The payload is streamed directly to RustFS S3 storage under the designated namespace `uploads/HR/`.
+3. Upon upload completion, the client triggers `/api/v1/ingest/complete`, queuing the job in RabbitMQ.
+4. The background AI Engine retrieves the object, passes binary streams to Apache Tika for parsing, and
+   chunks the sanitized plain text using recursive 500-character windows with 50-character overlaps.
+
+7.3 Phase III: Semantic Collision Detection and Adjudication
+1. Chunks are converted into 384-dimensional dense vectors using `all-MiniLM-L6-v2`.
+2. Cosine distance search is evaluated against active HR chunks in PostgreSQL pgvector.
+3. If cosine similarity meets or exceeds the calibrated threshold (tau = 0.85), the candidate pair is
+   transferred to the Cross-Encoder Natural Language Inference (NLI) model (`deberta-v3`).
+4. Chunks evaluated as CONTRADICTORY or SUPERSEDING are routed to the Quarantine Queue.
+5. The designated Data Steward reviews the side-by-side diff in the web portal and renders an authoritative
+   verdict (`PROMOTED_INCOMING`, `KEEP_EXISTING`, or `MANUALLY_MERGED`) with mandatory written rationale.
+
+7.4 Phase IV: Publication, Cache Invalidation, and Index Commit
+1. Approved chunks are committed to `vector_chunks` with status `ACTIVE`.
+2. Existing conflicting chunks are soft-archived (`ARCHIVED`), preserving full historical lineage.
+3. The Gateway flushes all cached query entries for Tenant `HR` in Redis (`rag:query:HR:*`).
+4. Provenance edges connecting Document -> Chunks -> Decisions are committed to the graph database.
+
+================================================================================
+SECTION 8: RISK MANAGEMENT, CONTROLS, AND FRAUD MITIGATION
+================================================================================
+8.1 Risk Identification and Impact Categorization
+Operational risks associated with Enterprise Total Rewards, Merit Bands & Executive Compensation are classified into three severity tiers:
+- High Severity (Tier 1): Failure of core security controls, unauthorized disclosure of sensitive data,
+  systemic regulatory violations, or unhedged financial exposure > $100,000.
+- Moderate Severity (Tier 2): Deficiencies in internal documentation, delayed quarantine resolution (> 48h),
+  unauthorized minor expenditure variances, or repetitive workflow bottlenecks.
+- Low Severity (Tier 3): Administrative typos, isolated receipt reconciliation delays, or non-material deviations.
+
+8.2 Internal Control Testing Cadence
+Internal controls specified in this manual must undergo formal audit testing according to the following schedule:
+(a) Continuous automated telemetry monitoring via Server-Sent Events (SSE) and Prometheus;
+(b) Monthly operational reconciliations conducted by departmental supervisors;
+(c) Quarterly independent testing executed by the Internal Audit Department;
+(d) Annual comprehensive external examination conducted by independent certified auditors.
+
+================================================================================
+SECTION 9: DATA GOVERNANCE, AUDIT TRAIL, AND RETENTION DIRECTIVES
+================================================================================
+9.1 Immutable Hash-Chained Audit Ledger
+Every governance action, administrative modification, authentication event, and quarantine decision executed
+under this standard must be permanently recorded in the PostgreSQL `compliance_audit_log` ledger.
+Each entry cryptographically binds:
+- Sequence Identifier and UTC Timestamp;
+- Actor Email, System Role, and Originating IP Address;
+- Department/Tenant Scope (`HR`) and Target Entity Identifier;
+- Canonical Action Code and Justification Payload;
+- SHA-256 Digest of the Preceding Audit Block, establishing an unbroken cryptographic chain.
+
+9.2 Anti-Tampering Verification Protocol
+The Internal Audit Department shall execute automated verification of the cryptographic audit chain
+at least once weekly via `GET /api/v1/audit/verify`. Any detected discrepancy or hash mismatch triggers
+an immediate Level 1 security incident investigation.
+
+9.3 Statutory Retention Schedule
+In compliance with corporate policy and statutory mandates (including SEC Rule 17a-4 and GDPR Art. 30):
+- Active Policy Documents: Retained indefinitely throughout operational lifecycle.
+- Superseded / Archived Documents: Retained in encrypted cold storage for a minimum statutory period of ten (10) years.
+- Audit Event Logs: Retained in immutable write-once-read-many (WORM) storage for a minimum of seven (7) years.
+- Temporary Ingestion Buffers: Purged automatically after thirty (30) calendar days.
+
+================================================================================
+SECTION 10: INTER-DEPARTMENTAL DEPENDENCIES AND CROSS-FUNCTIONAL PROTOCOLS
+================================================================================
+10.1 Coordination with Information Technology & Platform Engineering
+The HR Department relies upon Platform Engineering for infrastructure availability, database clustering,
+network firewall configurations, and vector index performance tuning. Service level agreements mandate
+99.99% system availability during core operational hours.
+
+10.2 Coordination with Legal & Regulatory Affairs
+Any proposed operational modification that implicates statutory compliance, international data residency,
+or contractual liability caps must receive formal concurrence from the Legal Department prior to ratification.
+
+10.3 Coordination with Internal Financial Operations
+Financial commitments, expenditure reconciliations, and capital amortizations must synchronize with the
+general ledger maintained by the Corporate Finance & Treasury Department.
+
+================================================================================
+SECTION 11: METRICS, KEY PERFORMANCE INDICATORS (KPIS), AND REPORTING
+================================================================================
+11.1 Operational Key Performance Indicators
+The efficacy of operations governed by this manual shall be evaluated against the following benchmark targets:
+-----------------------------------------------------------------------------------------------------------------
+Performance Indicator                | Metric Target           | Measurement Cadence | Escalation Threshold
+-----------------------------------------------------------------------------------------------------------------
+Policy Collision Quarantine SLA      | < 24 Business Hours     | Weekly Review       | > 48 Hours Pending
+Vector Retrieval Query Latency (p50) | < 10.0 Milliseconds     | Continuous Telemetry| > 25.0 Milliseconds
+Redis Query Cache Hit Ratio          | > 65.0% Overall Traffic | Daily Aggregation   | < 40.0% Cache Hit Rate
+Cryptographic Audit Ledger Integrity | 100.0% Verified Blocks  | Weekly Automated Run| < 100.0% (Zero Tolerance)
+Employee Training Completion Rate    | > 98.0% Eligible Staff  | Quarterly Cycle     | < 90.0% Departmental Rate
+Mandatory Exception Closeout Rate    | > 95.0% Within SLA      | Monthly Review      | < 85.0% Timely Resolution
+-----------------------------------------------------------------------------------------------------------------
+
+11.2 Executive Reporting Cadence
+Departmental leadership must prepare and submit an executive compliance scorecard to the Governance Council
+by the tenth business day following the conclusion of each fiscal quarter.
+
+================================================================================
+SECTION 12: EXCEPTION MANAGEMENT, ESCALATION, AND WAIVER PROTOCOL
+================================================================================
+12.1 Criteria for Operational Waivers
+Exceptions to the mandates articulated in this manual are strictly discouraged and shall be granted only upon
+clear demonstration of:
+(a) Extreme commercial necessity or unforeseen technological disruption;
+(b) Existence of compensatory controls that mitigate operational risk to acceptable thresholds;
+(c) Finite temporal duration not exceeding ninety (90) calendar days.
+
+12.2 Waiver Application and Approval Workflow
+1. The applicant submits a formal Exception Request Form articulating the operational justification, compensatory
+   controls, risk assessment, and proposed remediation timeline.
+2. The Department Director reviews and endorses the request (Level 1 Approval).
+3. The Department Vice President executes formal risk sign-off (Level 2 Approval).
+4. For high-risk or financial exceptions, final concurrence must be obtained from the Executive Governance Council.
+5. All approved waivers are logged in the Compliance Audit Ledger with an automated expiration trigger.
+
+================================================================================
+SECTION 13: ENFORCEMENT, PENALTIES, AND DISCIPLINARY SANCTIONS
+================================================================================
+13.1 Strict Enterprise Enforcement
+Compliance with this manual is a mandatory condition of employment and contractual engagement.
+Management is strictly prohibited from directing subordinates to violate any mandate set forth herein.
+
+13.2 Disciplinary Schedule for Violations
+Violations of this standard shall be investigated by Internal Audit and Human Resources, resulting in
+disciplinary sanctions proportionate to severity:
+- Level 1 (Minor / Inadvertent): Formal counseling, mandatory retraining, and documented written reprimand.
+- Level 2 (Serious / Negligent): Suspension of delegated authority, disqualification from performance bonuses,
+  and formal review by the Disciplinary Committee.
+- Level 3 (Gross / Willful): Immediate suspension pending investigation, termination of employment for cause,
+  clawback of incentive compensation, and referral to civil or criminal regulatory authorities where warranted.
+
+================================================================================
+SECTION 14: REVISION HISTORY AND RECORD OF PAST RATIFICATIONS
+================================================================================
+Document Revision Ledger:
+- Version 1.0 (March 15, 2021): Initial enterprise release and standard codification. Approved by Governance Council.
+- Version 2.0 (August 20, 2022): Major restructuring incorporating remote work models and multi-region operations.
+- Version 3.0 (October 10, 2023): Integration of automated semantic governance, vector indexing, and pgvector.
+- Version 3.1 (February 14, 2024): Updated Delegated Authority thresholds and Sarbanes-Oxley control linkages.
+- Version 3.2 (January 15, 2025): Current approved version. Full zero-trust cloud architecture alignment,
+  Server-Sent Events telemetry, and automated cryptographic hash-chain compliance certification.
+
+================================================================================
+APPENDIX A: OPERATIONAL STEP-BY-STEP CHECKLIST
+================================================================================
+Operational Readiness Verification Checklist:
+[ ] Step 1: Verify current document classification and metadata tagging prior to release.
+[ ] Step 2: Confirm dual-signatory approvals according to the Delegated Authority Matrix.
+[ ] Step 3: Execute pre-flight check on RustFS S3 bucket permissions under `uploads/HR/`.
+[ ] Step 4: Verify that Apache Tika text extraction and recursive chunking preserve clause semantic boundaries.
+[ ] Step 5: Check PostgreSQL pgvector index health and verify HNSW graph parameters (m=16, ef_construction=64).
+[ ] Step 6: Review Quarantine Queue for any flagged semantic collisions with historical policy versions.
+[ ] Step 7: Validate that resolution rationale exceeds statutory five-character minimum justification length.
+[ ] Step 8: Confirm tenant query cache invalidation in Redis across all live frontend and API consumer sessions.
+[ ] Step 9: Re-verify cryptographic audit ledger integrity via `GET /api/v1/audit/verify`.
+[ ] Step 10: File formal executive notification of successful publication with the Office of Corporate Governance.
+
+================================================================================
+APPENDIX B: STATUTORY CITATIONS AND REGULATORY MAPPINGS
+================================================================================
+Statutory & Standard Cross-Reference Matrix:
+- SOX 2002 § 404(a): Mapped to Section 5 (Delegated Authority) and Section 8 (Internal Controls Testing).
+- SEC Rule 17a-4(f): Mapped to Section 9.3 (Immutable WORM Storage and 10-Year Document Retention).
+- GDPR Article 25 & 32: Mapped to Section 3.3 (Data Protection by Design and Zero-Trust Tenant Isolation).
+- NIST SP 800-53 Rev 5 (AC-3, AU-2, IA-2): Mapped to Section 4 (Definitions) and Section 9 (Audit Logging).
+- ISO/IEC 27001:2022 Control A.5.15: Mapped to Section 6.2 (Segregation of Duties and Access Control).
+- AICPA SOC 2 Common Criteria CC6.1 - CC6.8: Mapped to Section 7 (Direct-to-Cloud Pipeline Controls).
+
+================================================================================
+END OF POLICY MANUAL: HR-POL-002-HR-2025-v3.2
+================================================================================
