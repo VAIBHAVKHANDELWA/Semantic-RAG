@@ -1,0 +1,34 @@
+# CLOUD ARCHITECTURE & PLATFORM ENGINEERING PLAYBOOK
+Department: Platform Engineering (Tenant: ENGINEERING)
+Effective Date: January 15, 2026
+Document Reference: ENG-ARCH-2026-PLAYBOOK
+
+1. Microservices System Decomposition Standards
+All backend services must be built as stateless, domain-driven microservices containerized via Docker. Service communication is strictly asynchronous through RabbitMQ message queues for event dissemination and gRPC or REST over TLS 1.3 for synchronous low-latency query paths.
+
+2. Source Control and Trunk-Based Development
+Teams practice trunk-based development on GitHub. Feature branches must be short-lived (less than 48 hours). Merging into main mandates passing automated static analysis, security linting, unit test suites (minimum 80% line coverage), and two independent peer code approvals.
+
+3. Multi-Tenant Relational and Vector Data Partitioning
+PostgreSQL 16 serves as the persistent multi-tenant relational and vector store with pgvector. Every table partition and schema index includes explicit tenant_id columns. Foreign key constraints enforce referential integrity across documents, vector_chunks, and provenance edges.
+
+4. High-Performance Caching and Fast-Path Routing
+Redis 7 is deployed as an in-memory high-throughput cache for token revocation denylists, SHA-256 deduplication locks (SET NX with TTL), query semantic cache, and cross-encoder adjudication verdicts. All cache keys follow strict namespacing conventions.
+
+5. Cloud-Native Object Storage Integration
+Document payloads are persisted directly into S3-compatible high-performance object storage (RustFS / MinIO). Applications utilize direct-to-cloud presigned PUT URLs, eliminating backend memory buffering and maximizing upload throughput.
+
+6. Text Extraction and Preprocessing Pipeline
+Document ingestion delegates binary format decomposition (PDF, DOCX, XLSX) to Apache Tika Server over HTTP. Extracted text undergoes recursive chunking with 500-character windows and 50-character overlaps before dense vector embedding generation.
+
+7. Dense Vector Embeddings and Indexing
+Text chunks are transformed into 384-dimensional dense vectors using the sentence-transformers/all-MiniLM-L6-v2 model. Vectors are indexed in PostgreSQL using Hierarchical Navigable Small World (HNSW) graphs with cosine distance metrics for sub-10ms nearest-neighbor recall.
+
+8. Semantic Collision Detection and Conflict Adjudication
+Incoming chunks undergo cosine similarity checks against active tenant chunks. Chunks exceeding the calibrated 0.85 similarity threshold trigger cross-encoder Natural Language Inference (NLI) analysis. Contradictory chunks are quarantined for human-in-the-loop governance.
+
+9. Cryptographic Audit Logging and Immutability
+All governance decisions, user authentication events, and quarantine resolutions are recorded in a hash-chained append-only compliance audit ledger. Every entry cryptographically seals its payload and the preceding entry's SHA-256 hash.
+
+10. End-to-End Observability and Real-Time Telemetry
+Microservices emit real-time metrics, queue depths, and audit notifications over Server-Sent Events (SSE) to the frontend console. Production logs are structured in JSON and ingested into OpenTelemetry collectors with trace IDs propagated across HTTP and AMQP boundaries.

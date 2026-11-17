@@ -27,3 +27,22 @@ Updated at: 2026-11-17T22:48:00+05:30.
 | **S7** | Zero Dummy Data Purge | Remove all fake intervals, synthetic Math.random logs; verify empty state | **PASS** | Purged `INITIAL_LOGS` and fake `setInterval` in `SystemLogsView.tsx`. Purged simulated upload intervals in `AppContext.tsx` and `DirectToCloudModal.tsx`. Frontend builds cleanly (`tsc -b && vite build` in 1.76s). | Critical |
 | **S8** | Progress Matrix Resolution | All PROGRESS.md rows verified or documented with severity | **PASS** | Full reconciliation in `docs/VERIFICATION_MATRIX.md` and `docs/PROGRESS.md`. Discrepancies and defense risks properly documented. | Medium |
 | **S9** | Hardening & Edge Cases | SQL injection, CORS origin check, ?token= SSE restriction, restart recovery | **PASS** | Verified via `tests/scenarios/test_s9_hardening_edge_cases.py`. SQL injection in parameters/bodies safely escaped. No DB credentials leaked in error payloads. Pre-flight CORS OPTIONS returns 200. `?token=` strictly accepted only on `/api/v1/telemetry/stream` SSE endpoint and rejected with 401 on standard REST endpoints. | High |
+
+## 3. Demo Readiness Deliverables (Phase 4)
+
+| Deliverable | Path | Status | Verification & Role |
+|---|---|:---:|---|
+| **Startup Automation** | `scripts/start-all.ps1` | **READY** | Automated launch of Docker, Java 21 Gateway, Python Engine, Vite UI with healthcheck polling. |
+| **Teardown Automation** | `scripts/stop-all.ps1` | **READY** | Graceful process termination across ports 5173, 8000, 8080 and optional Docker teardown. |
+| **Sanitization & Reset** | `scripts/reset-demo.ps1` | **READY** | Safely truncates business tables (preserving users/tenants), flushes Redis keys, purges queues and S3 objects. |
+| **Demo Policy Data** | `demo-data/` | **READY** | 7 realistic policy documents across HR, FINANCE, LEGAL (baseline & 2026 update collision pairs) and ENGINEERING playbook. |
+| **Demo Data Loader** | `scripts/load-demo.ps1` | **READY** | Automates ingestion via real `/ingest/upload-ticket` -> direct RustFS PUT -> `/ingest/complete` pipeline. |
+| **Threshold Calibration** | `benchmarks/eval/calibration.py` | **READY** | Executable threshold calibration on 250 labeled sentence pairs using local `all-MiniLM-L6-v2` confirming $\tau=0.85$. |
+| **Manual UI Checklist** | `docs/MANUAL_UI_CHECKLIST.md` | **READY** | Screen-by-screen click-through verification guide with exact inputs, visual outputs, and API-level proof. |
+| **10-Min Demo Script** | `docs/DEMO_SCRIPT.md` | **READY** | Minute-by-minute teacher presentation script with talking points, live actions, and Plan B contingencies. |
+| **Oral Defense & Viva Guide** | `docs/VIVA_QA.md` | **READY** | 25 deep-dive technical viva questions with architectural, mathematical, and code-level answers. |
+| **Architectural Boundaries** | `docs/KNOWN_LIMITATIONS.md` | **READY** | Transparent accounting of single-node boundaries, CPU cross-encoder latency, hybrid search, and future work. |
+| **Report Corrections** | `docs/REPORT_FIXES.md` | **READY** | Exhaustive catalog of 22 findings, false claims corrected, and verified Table 4.2 RBAC matrix. |
+
+**OVERALL DEMO READINESS: 100% READY FOR PRESENTATION**
+

@@ -1,0 +1,49 @@
+# CORPORATE LEGAL COMPLIANCE & REGULATORY MANUAL (2026 OMNIBUS UPDATE v2.0)
+Department: Legal & Compliance (Tenant: LEGAL)
+Effective Date: March 1, 2026
+Document Reference: LEG-COMP-2026-REV2
+
+1. Non-Disclosure Agreement (NDA) Survival Duration
+Confidentiality obligations and non-disclosure commitments established under enterprise standard bilateral agreements remain strictly enforceable for an extended period of seven (7) calendar years following agreement termination.
+
+2. Security Incident and Data Breach Notification Window
+In the event of a confirmed security incident involving customer personal data, mandatory written notification must be dispatched to regulatory authorities and affected parties within twenty-four (24) hours under updated standards.
+
+3. Standard Commercial Contract Liability Cap
+Enterprise Master Services Agreements (MSAs) must cap aggregate commercial liability to twice (2x) the total fees paid by the client during the preceding twelve (12) months.
+
+4. Governing Law and Dispute Arbitration Jurisdiction
+All commercial contracts executed by the enterprise shall be governed by the laws of the State of Delaware, with binding arbitration administered by JAMS in Wilmington, Delaware.
+
+5. GDPR and CCPA Data Subject Access Request (DSAR) SLA
+Formal data subject access requests, deletion requests, or opt-out petitions received under GDPR, CCPA, or applicable state privacy statutes must be fulfilled within fifteen (15) calendar days.
+
+6. Open Source Software License Usage Restrictions
+Utilization of software components licensed under copyleft licenses (GPL, LGPL, AGPL) within enterprise products requires containerized isolation and formal legal review prior to production build.
+
+7. Third-Party Vendor Risk Assessment Frequency
+All tier-1 enterprise vendors processing sensitive intellectual property or customer data must complete an in-depth security evaluation and penetration test review every six (6) months.
+
+8. Intellectual Property Assignment on Employment Inventions
+All patents, software code, designs, and proprietary inventions authored by employees during their tenure are the sole, exclusive, unencumbered property of the enterprise, with documented innovation bonus awards.
+
+9. Insider Trading Blackout Window Schedule
+Corporate officers and designated personnel are subject to mandatory quarterly trading blackout windows beginning twenty-one (21) calendar days prior to fiscal quarter end and lifting 24 hours post-earnings.
+
+10. Anti-Bribery and FCPA Compliance Protocols
+Employees and intermediaries are strictly prohibited from providing gifts, entertainment, or payments of any value to foreign government officials, with mandatory annual third-party agent screening.
+
+11. Export Control and EAR Compliance Protocols
+All encrypted software products, AI models, and proprietary algorithms must undergo automated classification review under the Export Administration Regulations prior to deployment.
+
+12. Whistleblower Protection and Investigation Protocol
+Whistleblower reports alleging accounting fraud, legal misconduct, or safety violations must be acknowledged within 24 hours and investigated under independent ombudsperson oversight.
+
+13. Record Hold Notice on Pending Litigation
+Upon receipt of formal notice of threatened or filed litigation, automated document deletion routines must be immediately suspended and a legal litigation hold issued across all communication records.
+
+14. Customer Data Processing Agreement (DPA) Requirements
+All customer engagements involving personal identifying data must execute the standard Enterprise Data Processing Addendum incorporating EU Standard Contractual Clauses (SCCs) and UK IDTA.
+
+15. Contract Execution Delegated Authority Matrix
+Contracts committing enterprise liability up to $500,000 may be signed by Department Directors; commitments exceeding $500,000 mandate General Counsel and Chief Executive Officer signature.
