@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { 
-  Cloud, 
-  ArrowRight, 
-  Key, 
-  Server, 
-  CheckCircle2, 
-  Zap, 
+import {
+  Cloud,
+  ArrowRight,
+  Key,
+  Server,
+  CheckCircle2,
+  Zap,
   X
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';

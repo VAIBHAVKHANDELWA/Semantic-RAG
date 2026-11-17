@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { 
-  TenantScope, 
-  Tenant, 
-  IngestionItem, 
-  QuarantineConflict, 
-  DbscanCluster, 
-  SystemTelemetry, 
+import type {
+  TenantScope,
+  Tenant,
+  IngestionItem,
+  QuarantineConflict,
+  DbscanCluster,
+  SystemTelemetry,
   NotificationItem,
   AppRoute,
   ActiveViewType,
@@ -84,7 +84,7 @@ interface AppContextType {
   tenants: Tenant[];
   addTenant: (name: string, code: TenantScope, isolationLevel: Tenant['isolationLevel'], rateLimitReqPerMin?: number) => void;
   updateTenantRateLimit: (code: TenantScope, rateLimitReqPerMin: number) => void;
-  
+
   // Navigation active view
   activeView: ActiveViewType;
   setActiveView: (view: ActiveViewType) => void;
@@ -115,8 +115,8 @@ interface AppContextType {
   // Quarantine Conflicts
   conflicts: QuarantineConflict[];
   resolveConflict: (
-    conflictId: string, 
-    action: 'ACCEPTED_INCOMING' | 'PROMOTED_INCOMING_ARCHIVED_OLD' | 'KEPT_EXISTING' | 'DISCARDED_BOTH' | 'MANUALLY_MERGED', 
+    conflictId: string,
+    action: 'ACCEPTED_INCOMING' | 'PROMOTED_INCOMING_ARCHIVED_OLD' | 'KEPT_EXISTING' | 'DISCARDED_BOTH' | 'MANUALLY_MERGED',
     mergedText?: string
   ) => void;
 
@@ -318,7 +318,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addToast({
         type: nextState ? 'amber' : 'success',
         title: nextState ? 'AI Rate Limit Throttling Active' : 'Circuit Breaker Reset',
-        description: nextState 
+        description: nextState
           ? 'RabbitMQ queue backpressure detected. Dashboard shifted to THROTTLED warning mode.'
           : 'Backpressure cleared. Pipeline resumed high-throughput processing.'
       });
@@ -349,7 +349,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const id = `aud-${Date.now().toString().slice(-4)}`;
     const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
     const mockHash = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10) + Date.now().toString(16);
-    
+
     setAuditLogs(prev => [
       {
         ...entry,
@@ -515,7 +515,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Debug Role Switcher for live UI testing
   const setRoleDebug = (role: RbacRole) => {
     if (!user) return;
-    const targetEmail = role === 'DATA_STEWARD' ? 'hr_steward@enterprise.com' 
+    const targetEmail = role === 'DATA_STEWARD' ? 'hr_steward@enterprise.com'
       : (role === 'COMPLIANCE_AUDITOR' ? 'legal_auditor@enterprise.com' : 'hr_admin@enterprise.com');
     loginWithCredentials(targetEmail, 'password123');
   };
@@ -600,7 +600,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               description: `Conflict ${payload.conflictId} resolved via ${payload.action}.`
             });
             setConflicts(prev => prev.map(c => c.id === payload.conflictId ? { ...c, status: payload.action } : c));
-          } catch (err) {}
+          } catch (err) { }
         });
 
         eventSource.onerror = () => {
@@ -711,7 +711,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const userToken = user?.token || token;
     const isScanned = file.name.toLowerCase().includes('scanned') || file.name.endsWith('.png') || file.name.endsWith('.jpg');
     const itemId = `ing-${Date.now().toString().slice(-4)}`;
-    
+
     const newItem: IngestionItem = {
       id: itemId,
       fileName: file.name,
@@ -736,28 +736,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       // 1. Get Presigned S3 Ticket from Java Gateway
       const ticket = await getUploadTicket(file.name, userToken);
-      
-      setIngestionQueue(prev => prev.map(item => 
-        item.id === itemId 
-          ? { ...item, progressPercentage: 60, stage: 'EMBEDDING' } 
+
+      setIngestionQueue(prev => prev.map(item =>
+        item.id === itemId
+          ? { ...item, progressPercentage: 60, stage: 'EMBEDDING' }
           : item
       ));
 
       // 2. Direct PUT to S3 / RustFS
       await uploadFileToS3(ticket.uploadUrl, file);
 
-      setIngestionQueue(prev => prev.map(item => 
-        item.id === itemId 
-          ? { ...item, progressPercentage: 85, stage: 'COLLISION_CHECK' } 
+      setIngestionQueue(prev => prev.map(item =>
+        item.id === itemId
+          ? { ...item, progressPercentage: 85, stage: 'COLLISION_CHECK' }
           : item
       ));
 
       // 3. Complete Ingestion on Java Gateway -> Dispatches to RabbitMQ
       const completeRes = await completeIngestion(ticket.objectKey, file.name, userToken);
 
-      setIngestionQueue(prev => prev.map(item => 
-        item.id === itemId 
-          ? { ...item, progressPercentage: 100, stage: 'IN_VECTOR_DB', vectorDbStatus: 'SYNCED' } 
+      setIngestionQueue(prev => prev.map(item =>
+        item.id === itemId
+          ? { ...item, progressPercentage: 100, stage: 'IN_VECTOR_DB', vectorDbStatus: 'SYNCED' }
           : item
       ));
 
@@ -774,9 +774,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } catch (err: any) {
       console.error('Ingestion failed for file:', file.name, err);
-      setIngestionQueue(prev => prev.map(item => 
-        item.id === itemId 
-          ? { ...item, stage: 'QUARANTINED', vectorDbStatus: 'PROCESSING' } 
+      setIngestionQueue(prev => prev.map(item =>
+        item.id === itemId
+          ? { ...item, stage: 'QUARANTINED', vectorDbStatus: 'PROCESSING' }
           : item
       ));
       addToast({
@@ -802,8 +802,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Resolve Quarantine Conflict with Soft-Delete Archiving
   const resolveConflict = (
-    conflictId: string, 
-    action: 'ACCEPTED_INCOMING' | 'PROMOTED_INCOMING_ARCHIVED_OLD' | 'KEPT_EXISTING' | 'DISCARDED_BOTH' | 'MANUALLY_MERGED', 
+    conflictId: string,
+    action: 'ACCEPTED_INCOMING' | 'PROMOTED_INCOMING_ARCHIVED_OLD' | 'KEPT_EXISTING' | 'DISCARDED_BOTH' | 'MANUALLY_MERGED',
     mergedText?: string
   ) => {
     const conflictToResolve = conflicts.find(c => c.id === conflictId);
@@ -816,7 +816,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setArchivedChunks(prev => [archivedItem, ...prev]);
     }
 
-    setConflicts(prev => 
+    setConflicts(prev =>
       prev.map(c => {
         if (c.id === conflictId) {
           const updatedIncoming = {
@@ -856,7 +856,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .then(() => {
           fetchAuditLogs(activeToken).then(logs => {
             if (logs && Array.isArray(logs)) setAuditLogs(logs);
-          }).catch(() => {});
+          }).catch(() => { });
         })
         .catch(err => console.warn('Backend resolve conflict sync error:', err));
     }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Sliders, 
-  Terminal, 
+import {
+  Sliders,
+  Terminal,
   Pause,
   Play
 } from 'lucide-react';
@@ -42,7 +42,7 @@ export const SystemLogsView: React.FC = () => {
   }, [sseLogs, isStreaming]);
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
@@ -66,11 +66,10 @@ export const SystemLogsView: React.FC = () => {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsStreaming(!isStreaming)}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold font-mono flex items-center gap-2 border transition-all ${
-              isStreaming 
-                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
-                : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-            }`}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold font-mono flex items-center gap-2 border transition-all ${isStreaming
+              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+              : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+              }`}
           >
             {isStreaming ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
             <span>{isStreaming ? 'Pause Live Stream' : 'Resume Live Stream'}</span>
