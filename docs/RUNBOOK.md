@@ -53,14 +53,14 @@ The platform decouples high-throughput document ingestion, asynchronous semantic
 
 | Service Name | Port | Protocol / Transport | Purpose |
 | :--- | :--- | :--- | :--- |
-| **Java API Gateway** | `8080` | HTTP / REST & SSE | JWT Auth, S3 Ticket Generator, Governance API, SSE stream |
-| **Python AI Engine** | `8000` | HTTP / REST | FastAPI healthcheck, DBSCAN clustering, Adjudication endpoints |
+| **Java API Gateway** | `8080` | HTTP / REST & SSE | JWT Auth, RustFS/S3 Ticket Generator, Governance API, SSE stream (`/api/v1/telemetry/stream`) |
+| **Python AI Engine** | `8000` | HTTP / REST | FastAPI healthcheck, DBSCAN clustering, Adjudication, Query caching |
 | **PostgreSQL 16** | `5432` | TCP (pgvector, pgcrypto) | Relational metadata, HNSW vector index, Audit trail |
 | **RabbitMQ AMQP** | `5672` | AMQP 0-9-1 | Task queue (`raw-document-queue`) & Telemetry (`telemetry-queue`) |
 | **RabbitMQ Console** | `15672` | HTTP Management UI | Message broker administration (`admin` / `adminpassword`) |
-| **MinIO S3 API** | `9000` | S3 REST API | Presigned direct-to-cloud file uploads (`semantic-rag-uploads`) |
-| **MinIO Console** | `9001` | HTTP Web Console | Object storage administration (`minioadmin` / `minioadmin`) |
-| **Redis 7** | `6379` | RESP / Redis TCP | SHA-256 deduplication cache, rate limiting, metric counters |
+| **RustFS S3 API** | `9000` | S3 REST API | Presigned direct-to-cloud file uploads (`semantic-rag-uploads`) |
+| **RustFS Console** | `9001` | HTTP Web Console | S3 Object storage administration |
+| **Redis 7** | `6379` | RESP / Redis TCP | SHA-256 deduplication cache, rate limiting, metric counters, denylist |
 | **Apache Tika Server** | `9998` | HTTP Tika API | Binary text extraction & OCR parsing (PDF, DOCX, scans) |
 | **React Web Client** | `5173` | HTTP (Vite Dev Server) | Administrative Governance Dashboard & Visual Diff Center |
 
@@ -197,7 +197,7 @@ All seeded users have the default password: **`password123`**
 
 | Key Pattern | Data Structure | TTL | Purpose |
 | :--- | :--- | :--- | :--- |
-| `denylist:jwt:{jti}` | String | Token Lifetime | Invalidation denylist for revoked JWT tokens on logout |
+| `token:denylist:{jti}` | String | Token Lifetime | Invalidation denylist for revoked JWT tokens on logout |
 | `dedup:{tenant}:{sha256(chunk)}` | String (`SET NX`) | None | Exact duplicate text pruning before embedding computation |
 | `adj:{tenant}:{sha256(a)}:{sha256(b)}` | String (JSON) | 30 days | Adjudication verdict cache for identical policy comparisons |
 | `rl:{userId}:{minute}` | Integer (Counter) | 60 sec | Sliding window rate limiting per user |

@@ -56,10 +56,14 @@ public class GovernanceService {
         QuarantineConflict conflict = getConflictById(conflictId, tenantId);
 
         String normalizedAction = (action != null) ? action.trim().toUpperCase() : "KEEP_EXISTING";
-        if ("APPROVE".equalsIgnoreCase(normalizedAction)) {
+        if ("APPROVE".equalsIgnoreCase(normalizedAction) || "PROMOTE_INCOMING".equalsIgnoreCase(normalizedAction)) {
             normalizedAction = "PROMOTED_INCOMING";
-        } else if ("REJECT".equalsIgnoreCase(normalizedAction)) {
+        } else if ("REJECT".equalsIgnoreCase(normalizedAction) || "REJECT_INCOMING".equalsIgnoreCase(normalizedAction)) {
             normalizedAction = "REJECT_INCOMING";
+        } else if ("MANUAL_MERGE".equalsIgnoreCase(normalizedAction) || "MANUALLY_MERGED".equalsIgnoreCase(normalizedAction)) {
+            normalizedAction = "MANUALLY_MERGED";
+        } else if ("KEEP".equalsIgnoreCase(normalizedAction) || "KEEP_EXISTING".equalsIgnoreCase(normalizedAction)) {
+            normalizedAction = "KEEP_EXISTING";
         }
 
         conflict.setStatus(normalizedAction);

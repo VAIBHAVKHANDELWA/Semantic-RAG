@@ -2,8 +2,12 @@ package com.middleware.gateway.controllers;
 
 import com.middleware.gateway.dto.ConflictResolutionRequestDTO;
 import com.middleware.gateway.models.ComplianceAuditLog;
+import com.middleware.gateway.models.Document;
 import com.middleware.gateway.models.ProvenanceEdge;
 import com.middleware.gateway.models.QuarantineConflict;
+import com.middleware.gateway.models.VectorChunk;
+import com.middleware.gateway.repositories.DocumentRepository;
+import com.middleware.gateway.repositories.VectorChunkRepository;
 import com.middleware.gateway.security.UserPrincipal;
 import com.middleware.gateway.services.GovernanceService;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +34,8 @@ import java.util.Map;
 public class GovernanceController {
 
     private final GovernanceService governanceService;
+    private final DocumentRepository documentRepository;
+    private final VectorChunkRepository vectorChunkRepository;
 
     /**
      * Endpoint 1: GET /api/v1/quarantine/pending
@@ -121,6 +127,47 @@ public class GovernanceController {
     ) {
         String tenantId = extractTenant(authentication);
         return ResponseEntity.ok(governanceService.getProvenanceEdges(conflictId, tenantId));
+    }
+
+    /**
+     * Endpoint 7: GET /api/v1/documents
+     * Lists all policy documents strictly scoped to the authenticated tenant.
+     */
+    @GetMapping("/documents")
+    @PreAuthorize("hasAnyRole('DATA_STEWARD', 'SYSTEM_ADMIN', 'COMPLIANCE_AUDITOR')")
+    public ResponseEntity<List<Document>> listDocuments(Authentication authentication) {
+        String tenantId = extractTenant(authentication);
+        return ResponseEntity.ok(documentRepository.findByTenantIdOrderByCreatedAtDesc(tenantId));
+    }
+
+    /**
+     * Endpoint 8: GET /api/v1/documents/{id}
+     * Retrieves document details for the tenant.
+     */
+    @GetMapping("/documents/{id}")
+    @PreAuthorize("hasAnyRole('DATA_STEWARD', 'SYSTEM_ADMIN', 'COMPLIANCE_AUDITOR')")
+    public ResponseEntity<Document> getDocument(
+            @PathVariable("id") String id,
+            Authentication authentication
+    ) {
+        String tenantId = extractTenant(authentication);
+        Document doc = documentRepository.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+        return ResponseEntity.ok(doc);
+    }
+
+    /**
+     * Endpoint 9: GET /api/v1/documents/{id}/chunks
+     * Retrieves chunks for a document (including ACTIVE, ARCHIVED, SUPERSEDED).
+     */
+    @GetMapping("/documents/{id}/chunks")
+    @PreAuthorize("hasAnyRole('DATA_STEWARD', 'SYSTEM_ADMIN', 'COMPLIANCE_AUDITOR')")
+    public ResponseEntity<List<VectorChunk>> getDocumentChunks(
+            @PathVariable("id") String id,
+            Authentication authentication
+    ) {
+        String tenantId = extractTenant(authentication);
+        return ResponseEntity.ok(vectorChunkRepository.findByDocumentIdAndTenantIdOrderByChunkIndexAsc(id, tenantId));
     }
 
     private String extractTenant(Authentication authentication) {

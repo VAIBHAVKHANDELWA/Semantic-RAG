@@ -60,24 +60,31 @@ export const AiPipelineVisualizer: React.FC = () => {
     }
   ]);
 
-  const handleRunSimulation = () => {
+  const handleRunSimulation = async () => {
     setIsRunning(true);
     setActiveStepIndex(0);
-
-    let current = 0;
-    const interval = setInterval(() => {
-      current++;
-      setActiveStepIndex(current);
-      if (current >= 4) {
-        clearInterval(interval);
-        setIsRunning(false);
+    try {
+      const aiEngineUrl = import.meta.env.VITE_AI_ENGINE_URL || 'http://localhost:8000';
+      const resp = await fetch(`${aiEngineUrl}/health`);
+      if (resp.ok) {
+        setActiveStepIndex(2);
+        const data = await resp.json();
+        setActiveStepIndex(4);
         addToast({
-          type: 'amber',
-          title: 'AI Pipeline Execution Complete',
-          description: `Collision pair evaluated. Flagged 89.4% contradiction routed to ${cleanTenant} Quarantine Queue.`
+          type: 'success',
+          title: 'Live Python AI Engine Verified',
+          description: `Connected to ${data.service} (${data.model}, ${data.vector_dimensions}-dim). Vector worker is active.`
         });
       }
-    }, 1200);
+    } catch (err: any) {
+      addToast({
+        type: 'rose',
+        title: 'AI Engine Unreachable',
+        description: `Could not connect to Python AI Engine: ${err.message}`
+      });
+    } finally {
+      setIsRunning(false);
+    }
   };
 
   return (

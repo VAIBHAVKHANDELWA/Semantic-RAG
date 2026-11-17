@@ -1,13 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { 
-  TenantScope, 
-  Tenant, 
-  IngestionItem, 
-  QuarantineConflict, 
-  DbscanCluster, 
-  SystemTelemetry, 
+import type {
+  TenantScope,
+  Tenant,
+  IngestionItem,
+  QuarantineConflict,
+  DbscanCluster,
+  SystemTelemetry,
   NotificationItem,
-  PipelineStage,
   AppRoute,
   ActiveViewType,
   User,
@@ -24,6 +23,7 @@ import { loginApi, logoutApi } from '../api/client';
 import { fetchPendingConflicts, resolveConflict as apiResolveConflict } from '../api/quarantine';
 import { fetchAuditLogs } from '../api/audit';
 import { fetchClusters } from '../api/clusters';
+import { getUploadTicket, uploadFileToS3, completeIngestion, fetchIngestionJobs } from '../api/ingestion';
 
 const DEFAULT_TENANTS: Tenant[] = [
   { id: 'HR', name: 'Human Resources & People Ops', code: 'HR', isolationLevel: 'Encrypted Tenant Context', activeConflictsCount: 0, totalIngestedDocs: 0, rateLimitReqPerMin: 600, storageUsedGb: 0.1 },
@@ -84,7 +84,7 @@ interface AppContextType {
   tenants: Tenant[];
   addTenant: (name: string, code: TenantScope, isolationLevel: Tenant['isolationLevel'], rateLimitReqPerMin?: number) => void;
   updateTenantRateLimit: (code: TenantScope, rateLimitReqPerMin: number) => void;
-  
+
   // Navigation active view
   activeView: ActiveViewType;
   setActiveView: (view: ActiveViewType) => void;
@@ -115,8 +115,8 @@ interface AppContextType {
   // Quarantine Conflicts
   conflicts: QuarantineConflict[];
   resolveConflict: (
-    conflictId: string, 
-    action: 'ACCEPTED_INCOMING' | 'PROMOTED_INCOMING_ARCHIVED_OLD' | 'KEPT_EXISTING' | 'DISCARDED_BOTH' | 'MANUALLY_MERGED', 
+    conflictId: string,
+    action: 'ACCEPTED_INCOMING' | 'PROMOTED_INCOMING_ARCHIVED_OLD' | 'KEPT_EXISTING' | 'DISCARDED_BOTH' | 'MANUALLY_MERGED',
     mergedText?: string
   ) => void;
 
@@ -207,38 +207,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [archivedChunks, setArchivedChunks] = useState<ChunkMetadata[]>([]);
 
   // Stage 2 State: Batch Ingestion Jobs & SSE Telemetry Logs
-  const [batchJobs, setBatchJobs] = useState<BatchIngestionJob[]>([
-    {
-      jobId: 'batch-9921',
-      batchName: 'Q3_HR_Policy_Batch_2026',
-      department: 'HR',
-      totalFiles: 42,
-      ocrFileCount: 8,
-      nativeFileCount: 34,
-      status: 'SPRING_BATCH_CHUNKING',
-      progressPercentage: 68,
-      chunksCreated: 1450,
-      conflictsFound: 3,
-      throughputChunksPerSec: 185,
-      estimatedTimeRemaining: '24s',
-      createdAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
-      backpressureActive: false
-    }
-  ]);
-
-  const [sseLogs, setSseLogs] = useState<SseTelemetryPayload[]>([
-    {
-      jobId: 'batch-9921',
-      timestamp: '19:26:01',
-      status: 'SPRING_BATCH_CHUNKING',
-      chunksCreated: 1450,
-      conflictsFound: 3,
-      throughputChunksPerSec: 185,
-      estimatedTimeRemaining: '24s',
-      circuitBreakerStatus: 'CLOSED',
-      logMessage: 'SSE Push [batch-9921]: Spring Batch chunker running at 185 chunks/sec.'
-    }
-  ]);
+  const [batchJobs, setBatchJobs] = useState<BatchIngestionJob[]>([]);
+  const [sseLogs, setSseLogs] = useState<SseTelemetryPayload[]>([]);
 
   const [isThrottled, setIsThrottled] = useState(false);
 
@@ -348,7 +318,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addToast({
         type: nextState ? 'amber' : 'success',
         title: nextState ? 'AI Rate Limit Throttling Active' : 'Circuit Breaker Reset',
-        description: nextState 
+        description: nextState
           ? 'RabbitMQ queue backpressure detected. Dashboard shifted to THROTTLED warning mode.'
           : 'Backpressure cleared. Pipeline resumed high-throughput processing.'
       });
@@ -379,7 +349,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const id = `aud-${Date.now().toString().slice(-4)}`;
     const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
     const mockHash = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10) + Date.now().toString(16);
-    
+
     setAuditLogs(prev => [
       {
         ...entry,
@@ -545,7 +515,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Debug Role Switcher for live UI testing
   const setRoleDebug = (role: RbacRole) => {
     if (!user) return;
-    const targetEmail = role === 'DATA_STEWARD' ? 'hr_steward@enterprise.com' 
+    const targetEmail = role === 'DATA_STEWARD' ? 'hr_steward@enterprise.com'
       : (role === 'COMPLIANCE_AUDITOR' ? 'legal_auditor@enterprise.com' : 'hr_admin@enterprise.com');
     loginWithCredentials(targetEmail, 'password123');
   };
@@ -630,7 +600,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               description: `Conflict ${payload.conflictId} resolved via ${payload.action}.`
             });
             setConflicts(prev => prev.map(c => c.id === payload.conflictId ? { ...c, status: payload.action } : c));
-          } catch (err) {}
+          } catch (err) { }
         });
 
         eventSource.onerror = () => {
@@ -723,54 +693,98 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [user?.token, user?.tenant, token]);
 
-  // Simulating ingestion pipeline progress
+  // Fetch real ingestion jobs from backend on auth change
   useEffect(() => {
-    const interval = setInterval(() => {
-      setIngestionQueue(prev => 
-        prev.map(item => {
-          if (item.stage === 'IN_VECTOR_DB' || item.stage === 'QUARANTINED') return item;
-          const nextProgress = Math.min(100, item.progressPercentage + 8);
-          let nextStage: PipelineStage = item.stage;
-          if (nextProgress > 25 && item.stage === 'INGESTING') nextStage = 'CHUNK_ADAPTIVE';
-          else if (nextProgress > 50 && item.stage === 'CHUNK_ADAPTIVE') nextStage = 'EMBEDDING';
-          else if (nextProgress > 75 && item.stage === 'EMBEDDING') nextStage = 'COLLISION_CHECK';
-          else if (nextProgress >= 100 && item.stage === 'COLLISION_CHECK') nextStage = 'IN_VECTOR_DB';
+    const userToken = user?.token || token;
+    if (!userToken) return;
+    fetchIngestionJobs(userToken)
+      .then(jobs => {
+        if (jobs && Array.isArray(jobs)) {
+          setBatchJobs(jobs);
+        }
+      })
+      .catch(err => console.warn('Could not fetch ingestion jobs:', err));
+  }, [user?.token, token]);
 
-          return {
-            ...item,
-            progressPercentage: nextProgress,
-            stage: nextStage,
-            vectorDbStatus: nextStage === 'IN_VECTOR_DB' ? 'SYNCED' : 'PROCESSING'
-          };
-        })
-      );
-    }, 2500);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Add File to Queue
-  const addIngestionFile = (file: File) => {
+  // Real Direct-to-Cloud File Ingestion Pipeline
+  const addIngestionFile = async (file: File) => {
+    const userToken = user?.token || token;
     const isScanned = file.name.toLowerCase().includes('scanned') || file.name.endsWith('.png') || file.name.endsWith('.jpg');
+    const itemId = `ing-${Date.now().toString().slice(-4)}`;
+
     const newItem: IngestionItem = {
-      id: `ing-${Date.now().toString().slice(-4)}`,
+      id: itemId,
       fileName: file.name,
-      department: selectedTenant === 'ALL' ? 'HR' : selectedTenant,
+      department: selectedTenant === 'ALL' ? (user?.tenant || 'HR') : selectedTenant,
       author: user?.name || 'Current User',
       uploadTimestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
       fileSize: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
       modality: isScanned ? 'OCR_TESSERACT' : 'NATIVE_TEXT',
       stage: 'INGESTING',
-      progressPercentage: 10,
-      chunkCount: Math.floor(Math.random() * 25) + 5,
+      progressPercentage: 25,
+      chunkCount: 0,
       vectorDbStatus: 'PROCESSING'
     };
 
     setIngestionQueue(prev => [newItem, ...prev]);
     addToast({
       type: 'info',
-      title: 'File Queued for Ingestion',
-      description: `"${file.name}" sent to ${newItem.modality === 'OCR_TESSERACT' ? 'Tesseract OCR Pipeline' : 'Apache Tika Text Extractor'}`
+      title: 'Upload Initiated',
+      description: `Requesting direct-to-cloud presigned ticket for "${file.name}"...`
     });
+
+    try {
+      // 1. Get Presigned S3 Ticket from Java Gateway
+      const ticket = await getUploadTicket(file.name, userToken);
+
+      setIngestionQueue(prev => prev.map(item =>
+        item.id === itemId
+          ? { ...item, progressPercentage: 60, stage: 'EMBEDDING' }
+          : item
+      ));
+
+      // 2. Direct PUT to S3 / RustFS
+      await uploadFileToS3(ticket.uploadUrl, file);
+
+      setIngestionQueue(prev => prev.map(item =>
+        item.id === itemId
+          ? { ...item, progressPercentage: 85, stage: 'COLLISION_CHECK' }
+          : item
+      ));
+
+      // 3. Complete Ingestion on Java Gateway -> Dispatches to RabbitMQ
+      const completeRes = await completeIngestion(ticket.objectKey, file.name, userToken);
+
+      setIngestionQueue(prev => prev.map(item =>
+        item.id === itemId
+          ? { ...item, progressPercentage: 100, stage: 'IN_VECTOR_DB', vectorDbStatus: 'SYNCED' }
+          : item
+      ));
+
+      addToast({
+        type: 'success',
+        title: 'Document Ingestion Queued',
+        description: `Job ${completeRes.jobId} created. Dispatched to RabbitMQ vector pipeline.`
+      });
+
+      // Refresh real jobs from backend
+      if (userToken) {
+        const updatedJobs = await fetchIngestionJobs(userToken);
+        if (updatedJobs) setBatchJobs(updatedJobs);
+      }
+    } catch (err: any) {
+      console.error('Ingestion failed for file:', file.name, err);
+      setIngestionQueue(prev => prev.map(item =>
+        item.id === itemId
+          ? { ...item, stage: 'QUARANTINED', vectorDbStatus: 'PROCESSING' }
+          : item
+      ));
+      addToast({
+        type: 'rose',
+        title: 'Ingestion Error',
+        description: `Failed to ingest "${file.name}": ${err.message || 'Network error'}`
+      });
+    }
   };
 
   const removeIngestionItem = (id: string) => {
@@ -788,8 +802,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Resolve Quarantine Conflict with Soft-Delete Archiving
   const resolveConflict = (
-    conflictId: string, 
-    action: 'ACCEPTED_INCOMING' | 'PROMOTED_INCOMING_ARCHIVED_OLD' | 'KEPT_EXISTING' | 'DISCARDED_BOTH' | 'MANUALLY_MERGED', 
+    conflictId: string,
+    action: 'ACCEPTED_INCOMING' | 'PROMOTED_INCOMING_ARCHIVED_OLD' | 'KEPT_EXISTING' | 'DISCARDED_BOTH' | 'MANUALLY_MERGED',
     mergedText?: string
   ) => {
     const conflictToResolve = conflicts.find(c => c.id === conflictId);
@@ -802,7 +816,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setArchivedChunks(prev => [archivedItem, ...prev]);
     }
 
-    setConflicts(prev => 
+    setConflicts(prev =>
       prev.map(c => {
         if (c.id === conflictId) {
           const updatedIncoming = {
@@ -839,6 +853,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       else if (action === 'MANUALLY_MERGED') mappedAction = 'MANUALLY_MERGED';
 
       apiResolveConflict(conflictId, mappedAction, 'Resolved by Data Steward via console', mergedText, activeToken)
+        .then(() => {
+          fetchAuditLogs(activeToken).then(logs => {
+            if (logs && Array.isArray(logs)) setAuditLogs(logs);
+          }).catch(() => { });
+        })
         .catch(err => console.warn('Backend resolve conflict sync error:', err));
     }
 

@@ -30,13 +30,14 @@ public class TelemetryListener {
      * RabbitMQ Telemetry Event Listener
      */
     @RabbitListener(queues = "telemetry-queue")
-    public void receiveTelemetryEvent(String messagePayload) {
-        log.info("Received telemetry message from RabbitMQ: {}", messagePayload);
+    public void receiveTelemetryEvent(org.springframework.amqp.core.Message message) {
         try {
-            TelemetryEvent event = objectMapper.readValue(messagePayload, TelemetryEvent.class);
+            String payload = new String(message.getBody(), java.nio.charset.StandardCharsets.UTF_8);
+            log.info("Received telemetry message from RabbitMQ: {}", payload);
+            TelemetryEvent event = objectMapper.readValue(payload, TelemetryEvent.class);
             sseConnectionManager.dispatchToTenant(event);
         } catch (Exception e) {
-            log.error("Failed to parse RabbitMQ telemetry event payload: {}", messagePayload, e);
+            log.error("Failed to parse RabbitMQ telemetry event message: {}", e.getMessage(), e);
         }
     }
 }

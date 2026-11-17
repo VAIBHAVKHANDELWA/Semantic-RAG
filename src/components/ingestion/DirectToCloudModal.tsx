@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import { 
-  Cloud, 
-  ArrowRight, 
-  Key, 
-  Server, 
-  CheckCircle2, 
-  Zap, 
+import {
+  Cloud,
+  ArrowRight,
+  Key,
+  Server,
+  CheckCircle2,
+  Zap,
   X
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { getUploadTicket } from '../../api/ingestion';
 import type { UploadTicketResponse } from '../../types';
 import { motion } from 'framer-motion';
 
@@ -18,7 +19,7 @@ interface DirectToCloudModalProps {
 }
 
 export const DirectToCloudModal: React.FC<DirectToCloudModalProps> = ({ isOpen, onClose }) => {
-  const { requestUploadTicket, selectedTenant, user } = useApp();
+  const { selectedTenant, user } = useApp();
   const [testFileName, setTestFileName] = useState('Enterprise_Q3_Financial_Audit_2026.pdf');
   const [testFileSizeMb, setTestFileSizeMb] = useState(48.5);
   const [activeTicket, setActiveTicket] = useState<UploadTicketResponse | null>(null);
@@ -26,17 +27,42 @@ export const DirectToCloudModal: React.FC<DirectToCloudModalProps> = ({ isOpen, 
 
   const cleanTenant = selectedTenant === 'ALL' ? 'HR' : selectedTenant;
 
-  const handleGenerateTicket = () => {
-    const ticket = requestUploadTicket(testFileName, testFileSizeMb * 1024 * 1024, cleanTenant);
-    setActiveTicket(ticket);
-    setStep(2);
+  const handleGenerateTicket = async () => {
+    try {
+      const ticket = await getUploadTicket(testFileName, user?.token);
+      setActiveTicket({
+        ticketId: ticket.ticketId,
+        presignedUrl: ticket.uploadUrl,
+        s3Bucket: ticket.bucketName,
+        s3Key: ticket.objectKey,
+        expiresInSeconds: ticket.expiresInSeconds,
+        tenantFolder: (ticket.tenantId as any) || cleanTenant,
+        maxByteSize: 104857600
+      });
+      setStep(2);
+    } catch (err) {
+      console.error('Failed to generate real ticket from Gateway:', err);
+    }
   };
 
-  const handleSimulateDirectS3Put = () => {
+  const handleSimulateDirectS3Put = async () => {
+    if (!activeTicket) return;
     setStep(3);
-    setTimeout(() => {
-      setStep(4);
-    }, 1500);
+    try {
+      const sampleBlob = new Blob(["Enterprise Semantic RAG Direct-to-Cloud Verification Sample"], { type: "text/plain" });
+      const resp = await fetch(activeTicket.presignedUrl, {
+        method: 'PUT',
+        body: sampleBlob,
+        headers: { 'Content-Type': 'text/plain' }
+      });
+      if (resp.ok) {
+        setStep(4);
+      } else {
+        console.error('Direct S3 PUT failed:', resp.status);
+      }
+    } catch (err) {
+      console.error('Direct S3 PUT failed:', err);
+    }
   };
 
   if (!isOpen) return null;

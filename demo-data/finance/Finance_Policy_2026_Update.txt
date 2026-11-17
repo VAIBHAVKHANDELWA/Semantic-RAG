@@ -1,0 +1,49 @@
+# ENTERPRISE FINANCIAL GOVERNANCE AND TREASURY MANUAL (2026 TREASURY UPDATE v2.0)
+Department: Finance & Treasury (Tenant: FINANCE)
+Effective Date: February 1, 2026
+Document Reference: FIN-GOV-2026-REV2
+
+1. Capital Expenditure Authorization Thresholds
+Capital expenditure (CapEx) commitments exceeding $25,000 must obtain written authorization from the Department Vice President and Chief Financial Officer prior to contract execution, reflecting adjusted project scale.
+
+2. Standard Commercial Invoice Payment Terms
+All approved third-party vendor commercial invoices will be processed and disbursed on Net-45 payment terms following verification by accounts payable to optimize corporate cash-flow management.
+
+3. Petty Cash Allocation and Custody
+Petty cash funds held at regional field offices are expanded to a maximum of $1,000. Any single petty cash disbursement exceeding $100 requires dual-custody physical receipts and branch sign-off.
+
+4. Corporate Credit Card Reconciliation Window
+Monthly statements for enterprise-issued corporate credit cards must be reconciled with receipts uploaded into the ERP system within ten (10) business days following statement generation.
+
+5. Out-of-Pocket Expense Submission Deadline
+Employee out-of-pocket business expenses submitted within forty-five (45) days following the date of incurrence will be eligible for reimbursement processing.
+
+6. International Wire Transfer Dual-Authorization
+All outgoing international wire transfers exceeding $50,000 require dual cryptographic authorization from two independent authorized bank signatories on separate corporate devices.
+
+7. Audit Trail Document Retention Mandate
+All general ledger transaction journals, tax schedules, and invoice records must be retained in encrypted digital storage for an extended statutory minimum duration of ten (10) years.
+
+8. Quarterly Financial Close Reconciliation Deadlines
+Regional controllers must finalize and close departmental general ledgers by 5:00 PM EST on the fifth business day following the conclusion of each fiscal quarter.
+
+9. Foreign Currency Hedging Policy
+Operating foreign currency cash exposures exceeding $1,000,000 equivalent must be hedged using forward exchange contracts through approved investment banking counterparties.
+
+10. Fixed Asset Depreciation Methodology
+All enterprise computing hardware and networking equipment must be depreciated using straight-line amortization over a useful life of four (4) years with zero salvage value.
+
+11. Travel and Entertainment Entertainment Expense Limit
+Client business entertainment dining expenses are adjusted to $225 per person inclusive of gratuity, requiring executive approval for client parties exceeding six participants.
+
+12. Vendor Onboarding and Sanctions Screening
+All new corporate vendors with anticipated annual spend exceeding $10,000 must complete comprehensive OFAC sanctions screening and creditworthiness verification.
+
+13. Discretionary Departmental Budget Variance Threshold
+Department heads are permitted a monthly discretionary operating budget variance up to 8% or $10,000, whichever is lower, without requiring prior CFO notification.
+
+14. Mileage Reimbursement Rate for Personal Vehicle Use
+Authorized business travel conducted via personal vehicle is reimbursed at the updated rate of $0.67 per mile, documented via GPS mileage logs.
+
+15. Surplus Capital Cash Investment Policy
+Surplus operating cash balances may be invested in AAA-rated overnight sovereign treasuries, commercial paper rated A-1/P-1, or FDIC-insured accounts.

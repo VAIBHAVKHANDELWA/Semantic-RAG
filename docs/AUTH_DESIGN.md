@@ -40,7 +40,7 @@ Public user self-registration is strictly disallowed. All accounts are provision
 +-------------------------------+        +--------------------+        +-------------------------------+
 |     PostgreSQL (users)        |        |    Redis 7 Cache   |        |  PostgreSQL (audit_log)       |
 | - failed_login_attempts       |        | Key:               |        | - prev_hash (Parent Link)     |
-| - locked_until (15m lockout)  |        | denylist:jwt:{jti} |        | - integrity_hash (SHA-256)    |
+| - locked_until (15m lockout)  |        | token:denylist:{jti}|       | - integrity_hash (SHA-256)    |
 | - must_change_password        |        | TTL: Token Expiry  |        | - Immutable append-only log   |
 | - is_super_admin              |        +--------------------+        +-------------------------------+
 +-------------------------------+
@@ -70,7 +70,7 @@ Public user self-registration is strictly disallowed. All accounts are provision
 2. **Consecutive Failure Counter & 15-Minute Lockout**:
    - Each failed password attempt increments `users.failed_login_attempts`.
    - Upon the **5th consecutive failure**, `users.locked_until` is set to `now() + 15 minutes`, and an append-only `LOGIN_LOCKOUT` audit entry is cryptographically committed.
-   - Subsequent login attempts (even with the correct password) are rejected with:
+   - Subsequent login attempts (even with the correct password) are rejected with HTTP 401 Unauthorized (anti-enumeration principle):
      ```json
      { "error": "Account locked due to consecutive failed attempts. Try again in X minute(s)." }
      ```
@@ -84,13 +84,13 @@ Public user self-registration is strictly disallowed. All accounts are provision
 1. **Complexity Rules (Enforced via Regex `^(?=.*[A-Za-z])(?=.*\\d).{10,}$`)**:
    - **Minimum Length**: At least 10 characters.
    - **Alphabetical Character**: Must contain at least one letter (`[A-Za-z]`).
-   - **Numeric Character**: Must contain at least one digit (`0-9]`).
+   - **Numeric Character**: Must contain at least one digit (`[0-9]`).
    - **Non-Identity**: The new password cannot match the existing or temporary password.
 
 2. **Forced Password Rotation Workflow (`must_change_password = true`)**:
    - Newly provisioned accounts and administrator-reset accounts carry `must_change_password = true`.
    - The generated JWT token includes the claim `"mustChange": true`.
-   - `JwtAuthenticationFilter` intercepts all incoming requests from tokens with `mustChange = true`. Any attempt to access business endpoints (e.g. `/api/v1/quarantine/*`, `/api/v1/ingest/*`, `/api/v1/admin/*`) is immediately rejected with:
+   - `JwtAuthenticationFilter` intercepts all incoming requests from tokens with `mustChange = true`. Any attempt to access business endpoints (e.g. `/api/v1/quarantine/*`, `/api/v1/ingest/*`, `/api/v1/admin/*`) is immediately rejected with HTTP 403 Forbidden:
      ```json
      { "error": "Forbidden: Password change required before accessing other resources" }
      ```
@@ -106,12 +106,12 @@ Public user self-registration is strictly disallowed. All accounts are provision
    - The remaining token validity is calculated: `TTL = exp - now()`.
    - A Redis key is set:
      ```redis
-     SET denylist:jwt:<jti> "revoked" EX <remaining_seconds>
+     SET token:denylist:<jti> "revoked" EX <remaining_seconds>
      ```
 2. **Filter-Level Enforcement**:
    - For every incoming request, `JwtAuthenticationFilter` queries Redis:
      ```java
-     Boolean isRevoked = redisTemplate.hasKey("denylist:jwt:" + jti);
+     Boolean isRevoked = redisTemplate.hasKey("token:denylist:" + jti);
      ```
    - If present, the token is rejected immediately with HTTP 401 Unauthorized, ensuring true instant token revocation without waiting for JWT expiration.
 

@@ -89,6 +89,31 @@ This document details every statement, table, architecture claim, metric, and sp
 - **Actual Code**: Components imported fake mock constants from `src/data/mockData.ts`.
 - **Correction Applied**: Completely deleted `mockData.ts`. Wired `AppContext`, `PersonaDashboard`, `AnalyticsDashboard`, `DbscanClusterChart`, and `LineageGraph` to live backend APIs.
 
+### Finding F18: RabbitMQ Jackson Deserialization Error on Telemetry Queue
+- **Report Claim**: Telemetry events flow seamlessly from Python worker to Gateway to frontend SSE.
+- **Actual Code**: `TelemetryListener.java` accepted `String messagePayload`. `Jackson2JsonMessageConverter` threw `MismatchedInputException: Cannot deserialize value of type java.lang.String from Object value`.
+- **Correction Applied**: Changed parameter to `org.springframework.amqp.core.Message message`, extracting body bytes and deserializing directly via `ObjectMapper`.
+
+### Finding F19: Missing Document & VectorChunk REST Catalog Endpoints
+- **Report Claim**: Data stewards can browse prior document versions and individual chunk embeddings.
+- **Actual Code**: Gateway lacked JPA mappings and endpoints to list ingested documents and chunks.
+- **Correction Applied**: Added `Document` and `VectorChunk` JPA entities, repositories, and endpoints `GET /api/v1/documents`, `GET /api/v1/documents/{id}`, and `GET /api/v1/documents/{id}/chunks`.
+
+### Finding F20: Client-Side Simulation Loops in React Frontend
+- **Report Claim**: Production UI consumes real-time SSE telemetry and direct-to-cloud upload states.
+- **Actual Code**: `SystemLogsView.tsx` used `INITIAL_LOGS` with `Math.random()`, `AppContext.tsx` used synthetic `setInterval` simulating upload progression, and `DirectToCloudModal.tsx` simulated tickets with `setTimeout`.
+- **Correction Applied**: Purged all fake intervals and synthetic logs. System logs now display pure SSE events from `/api/v1/telemetry/stream` with empty-state indicators; upload progress tracks real S3 PUT request states.
+
+### Finding F21: Quarantine Action Constraint Violation
+- **Report Claim**: Data steward can promote incoming chunks.
+- **Actual Code**: Action `"PROMOTE_INCOMING"` was stored directly, violating database check constraint `status IN ('PENDING', 'PROMOTED_INCOMING', 'KEEP_EXISTING', 'REJECT_INCOMING', 'MANUALLY_MERGED')`.
+- **Correction Applied**: Normalized incoming action to `"PROMOTED_INCOMING"` in `GovernanceService.java`.
+
+### Finding F22: Tika Extraction Fallback on Corrupt Binary Files
+- **Report Claim**: Corrupt and unreadable files are quarantined.
+- **Actual Code**: When Tika failed on binary files (.pdf, .bin), `storage_service.py` caught the error and fell back to raw byte string decoding, causing corrupt files to be mistakenly chunked.
+- **Correction Applied**: Explicitly raised `RuntimeError` on non-200 Tika responses for binary extensions, allowing worker to catch and route files cleanly to `quarantine_queue` with status `CORRUPT_FILE`.
+
 ---
 
 ## 2. Fabricated Metrics to be Corrected in Report

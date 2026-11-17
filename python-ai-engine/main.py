@@ -1,6 +1,7 @@
 import logging
 import os
 from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional
@@ -144,6 +145,7 @@ def get_dbscan_clusters(
 ):
     """
     T1.2: Unsupervised DBSCAN topic clustering on quarantined chunk vectors.
+    Uses cosine distance metric (eps=0.15, min_samples=12) with PCA 2D projection.
     Uses cosine distance metric with configurable eps and min_samples (env vars, body, or query params).
     PCA 2D projection for UI scatter plot visualization.
     """
@@ -343,6 +345,7 @@ def query_rag_knowledge_base(req: QueryRequest):
 
     if rc:
         try:
+            rc.setex(cache_key, 3600, json.dumps(response_payload))
             rc.setex(cache_key, QUERY_CACHE_TTL, json.dumps(response_payload))
             rc.incr("metrics:query:cache_misses")
             rc.incr("metrics:query:total")
