@@ -30,22 +30,23 @@ export const QuarantineCenter: React.FC = () => {
     user
   } = useApp();
 
-  const [minSimilarity, setMinSimilarity] = useState<number>(0.85);
+  const [minSimilarity, setMinSimilarity] = useState<number>(0.80);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'RESOLVED'>('ALL');
   const [mergeModalOpen, setMergeModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Filter conflicts based on Tenant, Similarity threshold, Status, and Search
   const filteredConflicts = conflicts.filter(c => {
-    if (selectedTenant !== 'ALL' && c.department !== selectedTenant) return false;
+    const dept = c.department || c.tenantId;
+    if (selectedTenant !== 'ALL' && dept !== selectedTenant) return false;
     if (c.similarityScore < minSimilarity) return false;
     if (statusFilter === 'PENDING' && c.status !== 'PENDING') return false;
     if (statusFilter === 'RESOLVED' && c.status === 'PENDING') return false;
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      const matchDocA = c.existingChunk.docName.toLowerCase().includes(query);
-      const matchDocB = c.incomingChunk.docName.toLowerCase().includes(query);
-      const matchExp = c.contradictionExplanation.toLowerCase().includes(query);
+      const matchDocA = (c.existingChunk?.docName || '').toLowerCase().includes(query);
+      const matchDocB = (c.incomingChunk?.docName || '').toLowerCase().includes(query);
+      const matchExp = (c.contradictionExplanation || '').toLowerCase().includes(query);
       if (!matchDocA && !matchDocB && !matchExp) return false;
     }
     return true;

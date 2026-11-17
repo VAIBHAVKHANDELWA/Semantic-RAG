@@ -68,7 +68,7 @@ LIMIT 5;`;
             <span>PostgreSQL + pgvector Cosine Search Query</span>
           </div>
           <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px]">
-            HNSW Index: ivfflat (lists=100)
+            HNSW Index: pgvector (m=16, ef_construction=64)
           </span>
         </div>
 

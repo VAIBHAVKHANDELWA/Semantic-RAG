@@ -15,12 +15,13 @@ export const ComplianceAuditLogsView: React.FC = () => {
   const [departmentFilter, setDepartmentFilter] = useState<'ALL' | 'HR' | 'FINANCE' | 'LEGAL' | 'ENGINEERING'>('ALL');
 
   const filteredLogs = auditLogs.filter(log => {
-    if (departmentFilter !== 'ALL' && log.department !== departmentFilter) return false;
+    const dept = log.department || (log as any).tenantId;
+    if (departmentFilter !== 'ALL' && dept !== departmentFilter) return false;
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
-      const matchActor = log.actorName.toLowerCase().includes(q);
-      const matchDetails = log.details.toLowerCase().includes(q);
-      const matchTarget = log.targetId.toLowerCase().includes(q);
+      const matchActor = (log.actorName || '').toLowerCase().includes(q);
+      const matchDetails = (log.details || '').toLowerCase().includes(q);
+      const matchTarget = (log.targetId || '').toLowerCase().includes(q);
       if (!matchActor && !matchDetails && !matchTarget) return false;
     }
     return true;
@@ -119,15 +120,18 @@ export const ComplianceAuditLogsView: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-800/80">
               {filteredLogs.map(log => {
-                const actionBadges = {
+                const actionBadges: Record<string, string> = {
                   RESOLVE_ACCEPT: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
                   RESOLVE_KEEP: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
                   RESOLVE_DISCARD: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
                   MANUAL_MERGE: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30',
                   DOCUMENT_INGEST: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
                   TENANT_CREATE: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
-                  RATE_LIMIT_CHANGE: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30'
+                  RATE_LIMIT_CHANGE: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30',
+                  USER_UPDATE: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
+                  USER_CREATE: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
                 };
+                const badgeStyle = actionBadges[log.action] || 'bg-slate-800 text-slate-300 border-slate-700';
 
                 return (
                   <tr key={log.id} className="hover:bg-slate-800/40 transition-colors">
@@ -145,7 +149,7 @@ export const ComplianceAuditLogsView: React.FC = () => {
                       </span>
                     </td>
                     <td className="p-3.5 whitespace-nowrap">
-                      <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${actionBadges[log.action]}`}>
+                      <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${badgeStyle}`}>
                         {log.action}
                       </span>
                     </td>

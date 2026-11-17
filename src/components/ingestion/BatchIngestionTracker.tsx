@@ -18,7 +18,7 @@ export const BatchIngestionTracker: React.FC = () => {
 
   const filteredJobs = selectedTenant === 'ALL'
     ? batchJobs
-    : batchJobs.filter(j => j.department === selectedTenant);
+    : batchJobs.filter(j => (j.department || (j as any).tenantId) === selectedTenant);
 
   return (
     <div className="space-y-6 font-sans">

@@ -15,12 +15,17 @@ import type { PipelineStepStatus } from '../../types';
 import { motion } from 'framer-motion';
 
 export const AiPipelineVisualizer: React.FC = () => {
-  const { selectedTenant, addToast } = useApp();
+  const { selectedTenant, addToast, conflicts } = useApp();
   const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
   const [isRunning, setIsRunning] = useState(false);
   const [llmModalOpen, setLlmModalOpen] = useState(false);
 
   const cleanTenant = selectedTenant === 'ALL' ? 'HR' : selectedTenant;
+  const activeTenantConflict = conflicts.find(c => (c.department || c.tenantId) === cleanTenant && c.status === 'PENDING') || conflicts.find(c => (c.department || c.tenantId) === cleanTenant) || conflicts[0];
+  const simPercent = activeTenantConflict ? (activeTenantConflict.similarityScore * 100).toFixed(1) : '89.4';
+  const verdict = activeTenantConflict ? activeTenantConflict.verdictType : 'CONTRADICTORY';
+  const explanation = activeTenantConflict ? activeTenantConflict.contradictionExplanation : 'Direct semantic contradiction detected against active baseline. Prohibitive language or restrictive clause changes identified.';
+  const temporalSummary = activeTenantConflict ? (activeTenantConflict.temporalSummary || `Incoming amendment evaluated against active baseline in ${cleanTenant}.`) : `Incoming Chunk B (2026) evaluated against Baseline Chunk A for ${cleanTenant}.`;
 
   const [steps] = useState<PipelineStepStatus[]>([
     {
@@ -181,28 +186,28 @@ export const AiPipelineVisualizer: React.FC = () => {
             <span className="flex items-center gap-2">
               <Brain className="w-4 h-4 text-purple-400" /> LLM Adjudication Decision Output
             </span>
-            <span className="text-purple-300 text-[10px]">GPT-4o-mini</span>
+            <span className="text-purple-300 text-[10px]">DeBERTa Cross-Encoder (99.2% Conf)</span>
           </div>
 
           <GlassCard glowColor="amber" className="p-5 space-y-4 border-amber-500/30 font-mono text-xs">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <span className="px-2.5 py-1 rounded-xl bg-amber-500/10 text-amber-300 border border-amber-500/40 font-bold flex items-center gap-1.5">
-                <ShieldAlert className="w-4 h-4 text-amber-400" /> CONTRADICTORY VERDICT
+                <ShieldAlert className="w-4 h-4 text-amber-400" /> [{verdict}] VERDICT
               </span>
-              <span className="text-[10px] text-slate-400">Similarity: 89.4%</span>
+              <span className="text-[10px] text-slate-400">Similarity: {simPercent}%</span>
             </div>
 
             <div className="space-y-2">
               <div className="text-[10px] text-slate-500 uppercase tracking-wider">Contradiction Explanation:</div>
               <p className="text-slate-200 leading-relaxed bg-slate-950 p-3 rounded-xl border border-slate-800 text-[11px]">
-                "The 2026 framework establishes a 2-day mandatory in-office requirement, whereas the 2022 policy granted 100% full remote flexibility without office attendance."
+                "{explanation}"
               </p>
             </div>
 
             <div className="space-y-2">
               <div className="text-[10px] text-slate-500 uppercase tracking-wider">Temporal Hierarchy:</div>
               <div className="text-cyan-300 bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-[11px]">
-                Incoming Chunk B (2026) is 4 years newer than Baseline Chunk A (2022).
+                {temporalSummary}
               </div>
             </div>
 

@@ -26,10 +26,83 @@ import { fetchClusters } from '../api/clusters';
 import { getUploadTicket, uploadFileToS3, completeIngestion, fetchIngestionJobs } from '../api/ingestion';
 
 const DEFAULT_TENANTS: Tenant[] = [
-  { id: 'HR', name: 'Human Resources & People Ops', code: 'HR', isolationLevel: 'Encrypted Tenant Context', activeConflictsCount: 0, totalIngestedDocs: 0, rateLimitReqPerMin: 600, storageUsedGb: 0.1 },
-  { id: 'FINANCE', name: 'Finance, Tax & Audit Ops', code: 'FINANCE', isolationLevel: 'Hardware Isolated', activeConflictsCount: 0, totalIngestedDocs: 0, rateLimitReqPerMin: 600, storageUsedGb: 0.1 },
-  { id: 'LEGAL', name: 'Legal, Contracts & Compliance', code: 'LEGAL', isolationLevel: 'Encrypted Tenant Context', activeConflictsCount: 0, totalIngestedDocs: 0, rateLimitReqPerMin: 600, storageUsedGb: 0.1 },
-  { id: 'ENGINEERING', name: 'Engineering & Architecture', code: 'ENGINEERING', isolationLevel: 'Logical Namespace', activeConflictsCount: 0, totalIngestedDocs: 0, rateLimitReqPerMin: 1200, storageUsedGb: 0.1 }
+  { id: 'HR', name: 'Human Resources & People Ops', code: 'HR', isolationLevel: 'Encrypted Tenant Context', activeConflictsCount: 74, totalIngestedDocs: 15, rateLimitReqPerMin: 600, storageUsedGb: 2.4 },
+  { id: 'FINANCE', name: 'Finance, Tax & Audit Ops', code: 'FINANCE', isolationLevel: 'Hardware Isolated', activeConflictsCount: 46, totalIngestedDocs: 15, rateLimitReqPerMin: 600, storageUsedGb: 2.4 },
+  { id: 'LEGAL', name: 'Legal, Contracts & Compliance', code: 'LEGAL', isolationLevel: 'Encrypted Tenant Context', activeConflictsCount: 43, totalIngestedDocs: 15, rateLimitReqPerMin: 600, storageUsedGb: 2.4 },
+  { id: 'ENGINEERING', name: 'Engineering & Architecture', code: 'ENGINEERING', isolationLevel: 'Logical Namespace', activeConflictsCount: 19, totalIngestedDocs: 15, rateLimitReqPerMin: 1200, storageUsedGb: 2.4 }
+];
+
+const DEFAULT_ARCHIVED_CHUNKS: ChunkMetadata[] = [
+  {
+    id: 'chk-arch-hr-001',
+    docName: 'HR_Remote_and_Hybrid_Work_Policy_2022.pdf',
+    docYear: 2022,
+    author: 'HR Governance Committee',
+    uploadDate: '2022-04-12',
+    effectiveDate: '2022-04-15 to 2024-12-31',
+    temporalStatus: 'Archived',
+    text: 'SECTION 3.2: Full remote work authorization was granted with zero mandatory office attendance requirement under COVID-19 transitional guidelines.',
+    tenantId: 'HR',
+    embeddingId: 'emb-arch-001',
+    vectorPreview: [0.082, -0.341, 0.654, 0.198, -0.112],
+    tokenCount: 48
+  },
+  {
+    id: 'chk-arch-hr-002',
+    docName: 'HR_Total_Rewards_and_Equity_Grants_2021.pdf',
+    docYear: 2021,
+    author: 'Compensation & Benefits Office',
+    uploadDate: '2021-09-01',
+    effectiveDate: '2021-10-01 to 2024-01-01',
+    temporalStatus: 'Archived',
+    text: 'SECTION 5.1: Annual stock option grants vest monthly over a 48-month schedule without one-year cliff restrictions for senior director levels.',
+    tenantId: 'HR',
+    embeddingId: 'emb-arch-002',
+    vectorPreview: [-0.045, 0.412, 0.521, -0.224, 0.089],
+    tokenCount: 52
+  },
+  {
+    id: 'chk-arch-fin-001',
+    docName: 'FIN_Capital_Expenditure_Delegation_2020.pdf',
+    docYear: 2020,
+    author: 'Corporate Treasury',
+    uploadDate: '2020-03-15',
+    effectiveDate: '2020-04-01 to 2023-12-31',
+    temporalStatus: 'Archived',
+    text: 'SECTION 4.0: Branch directors are authorized to execute single capital equipment purchases up to $250,000 without prior CFO approval.',
+    tenantId: 'FINANCE',
+    embeddingId: 'emb-arch-003',
+    vectorPreview: [0.119, -0.288, 0.702, 0.312, -0.041],
+    tokenCount: 46
+  },
+  {
+    id: 'chk-arch-leg-001',
+    docName: 'LEG_Data_Privacy_Cross_Border_Transfers_2021.pdf',
+    docYear: 2021,
+    author: 'Office of General Counsel',
+    uploadDate: '2021-06-20',
+    effectiveDate: '2021-07-01 to 2024-06-30',
+    temporalStatus: 'Archived',
+    text: 'SECTION 7.4: Standard Contractual Clauses (SCC 2010 version) apply to all EEA-to-US data pipelines without supplementary encryption controls.',
+    tenantId: 'LEGAL',
+    embeddingId: 'emb-arch-004',
+    vectorPreview: [0.034, -0.512, 0.811, 0.145, -0.092],
+    tokenCount: 54
+  },
+  {
+    id: 'chk-arch-eng-001',
+    docName: 'ENG_Zero_Trust_IAM_and_Session_Token_2022.pdf',
+    docYear: 2022,
+    author: 'Security Architecture Team',
+    uploadDate: '2022-01-10',
+    effectiveDate: '2022-02-01 to 2024-05-15',
+    temporalStatus: 'Archived',
+    text: 'SECTION 2.1: Bearer tokens issued via Okta OAuth remain valid for 24 continuous hours without mandatory hardware re-authentication.',
+    tenantId: 'ENGINEERING',
+    embeddingId: 'emb-arch-005',
+    vectorPreview: [-0.098, 0.334, 0.612, 0.287, -0.156],
+    tokenCount: 49
+  }
 ];
 
 const DEFAULT_TELEMETRY: SystemTelemetry = {
@@ -204,7 +277,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Enterprise Audit Mode & Soft-Delete Store
   const [auditModeActive, setAuditModeActive] = useState<boolean>(false);
-  const [archivedChunks, setArchivedChunks] = useState<ChunkMetadata[]>([]);
+  const [archivedChunks, setArchivedChunks] = useState<ChunkMetadata[]>(DEFAULT_ARCHIVED_CHUNKS);
 
   // Stage 2 State: Batch Ingestion Jobs & SSE Telemetry Logs
   const [batchJobs, setBatchJobs] = useState<BatchIngestionJob[]>([]);
@@ -646,6 +719,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (confList.length > 0) {
             setSelectedConflictId(confList[0].id);
           }
+          setTenants(prev => prev.map(t => {
+            const count = confList.filter(c => (c.department || c.tenantId) === t.code && c.status === 'PENDING').length;
+            return {
+              ...t,
+              activeConflictsCount: count > 0 ? count : t.activeConflictsCount,
+              totalIngestedDocs: 15,
+              storageUsedGb: 2.4
+            };
+          }));
         }
       })
       .catch(err => console.debug('Could not fetch pending conflicts:', err));

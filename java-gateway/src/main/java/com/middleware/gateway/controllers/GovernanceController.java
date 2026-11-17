@@ -98,7 +98,7 @@ public class GovernanceController {
      * Returns compliance audit log history for the tenant.
      */
     @GetMapping("/audit/logs")
-    @PreAuthorize("hasAnyRole('COMPLIANCE_AUDITOR', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('COMPLIANCE_AUDITOR', 'SYSTEM_ADMIN', 'DATA_STEWARD')")
     public ResponseEntity<List<ComplianceAuditLog>> getAuditLogs(Authentication authentication) {
         String tenantId = extractTenant(authentication);
         return ResponseEntity.ok(governanceService.getAuditLogs(tenantId));
@@ -109,7 +109,7 @@ public class GovernanceController {
      * Recomputes and verifies the cryptographic SHA-256 integrity hash chain.
      */
     @GetMapping("/audit/verify")
-    @PreAuthorize("hasAnyRole('COMPLIANCE_AUDITOR', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('COMPLIANCE_AUDITOR', 'SYSTEM_ADMIN', 'DATA_STEWARD')")
     public ResponseEntity<Map<String, Object>> verifyAuditChain(Authentication authentication) {
         String tenantId = extractTenant(authentication);
         return ResponseEntity.ok(governanceService.verifyAuditChain(tenantId));

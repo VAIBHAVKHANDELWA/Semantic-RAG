@@ -66,7 +66,7 @@ export const LineageGraph: React.FC<LineageGraphProps> = ({ conflictId, isModal 
     {
       id: 'node-root-1',
       type: 'root_doc',
-      title: conflict ? conflict.incomingChunk.docName : 'Global_Remote_Work_Framework_2026.pdf',
+      title: conflict?.incomingChunk?.docName || 'Enterprise_Policy_Document.pdf',
       subtitle: 'Root Document (Native PDF)',
       status: 'clean',
       metadata: {

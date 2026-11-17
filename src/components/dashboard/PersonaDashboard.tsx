@@ -61,10 +61,11 @@ export const PersonaDashboard: React.FC = () => {
 
   // Filter conflicts for Data Steward
   const tenantConflicts = conflicts.filter(c => {
+    const dept = c.department || c.tenantId || tenant;
     if (selectedTenant !== 'ALL') {
-      return c.department === selectedTenant;
+      return dept === selectedTenant;
     }
-    return c.department === tenant || selectedTenant === 'ALL';
+    return dept === tenant || selectedTenant === 'ALL';
   });
 
   const pendingTenantConflicts = tenantConflicts.filter(c => c.status === 'PENDING');
@@ -104,6 +105,22 @@ export const PersonaDashboard: React.FC = () => {
 
   if (activeView === 'ai_pipeline') {
     return <AiPipelineVisualizer />;
+  }
+
+  if (activeView === 'lineage') {
+    return (
+      <div className="p-6 max-w-7xl mx-auto space-y-6">
+        <LineageGraph />
+      </div>
+    );
+  }
+
+  if (activeView === 'quarantine') {
+    return (
+      <div className="p-6 max-w-7xl mx-auto space-y-6">
+        <QuarantineCenter />
+      </div>
+    );
   }
 
   if (activeView === 'ingestion') {
@@ -179,7 +196,7 @@ export const PersonaDashboard: React.FC = () => {
                     {tenant} Ingested Documents
                   </div>
                   <div className="text-3xl font-extrabold text-slate-100 font-mono mt-1">
-                    {telemetry.quarantinedPendingCount + telemetry.exactDuplicatesPruned + (telemetry.processedTotal || 15)} <span className="text-xs font-normal text-slate-400">docs</span>
+                    {15} <span className="text-xs font-normal text-slate-400">docs</span>
                   </div>
                 </div>
                 <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
@@ -200,7 +217,7 @@ export const PersonaDashboard: React.FC = () => {
                     Resolved & Pruned Vectors
                   </div>
                   <div className="text-3xl font-extrabold text-emerald-400 font-mono mt-1">
-                    {telemetry.exactDuplicatesPruned + conflicts.filter(c => c.status !== 'PENDING').length} <span className="text-xs font-normal text-slate-400">cleared</span>
+                    {conflicts.filter(c => (c.department === tenant || selectedTenant === 'ALL') && c.status !== 'PENDING').length} <span className="text-xs font-normal text-slate-400">cleared</span>
                   </div>
                 </div>
                 <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
@@ -311,7 +328,7 @@ export const PersonaDashboard: React.FC = () => {
               </div>
               <h3 className="text-xl font-bold text-slate-100">Zero Conflicts in Queue</h3>
               <p className="text-xs text-slate-400 max-w-md mx-auto mt-1 leading-relaxed">
-                All semantic document vectors for the <span className="text-emerald-400 font-bold font-mono">{tenant}</span> department are clean, reconciled, and committed to Qdrant vector database.
+                All semantic document vectors for the <span className="text-emerald-400 font-bold font-mono">{tenant}</span> department are clean, reconciled, and committed to PostgreSQL pgvector (HNSW Index) database.
               </p>
               <div className="mt-6 flex items-center justify-center gap-3">
                 <button 

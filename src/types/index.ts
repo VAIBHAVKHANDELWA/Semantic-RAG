@@ -110,6 +110,7 @@ export interface QuarantineConflict {
   id: string;
   similarityScore: number; // e.g. 0.894 (89.4%)
   department: TenantScope;
+  tenantId?: TenantScope;
   verdictType: LLMVerdictType;
   contradictionExplanation: string;
   temporalSummary: string; // e.g. "Incoming Chunk B is 4 years newer"
