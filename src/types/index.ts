@@ -53,7 +53,7 @@ export interface Tenant {
   id: string;
   name: string;
   code: TenantScope;
-  isolationLevel: 'Hardware Isolated' | 'Logical Namespace' | 'Encrypted Tenant Context';
+  isolationLevel: 'PostgreSQL RLS / pgvector Namespace' | 'Schema Isolated' | string;
   activeConflictsCount: number;
   totalIngestedDocs: number;
   rateLimitReqPerMin?: number;
@@ -112,6 +112,7 @@ export interface QuarantineConflict {
   department: TenantScope;
   tenantId?: TenantScope;
   verdictType: LLMVerdictType;
+  verdictConfidence?: number;
   contradictionExplanation: string;
   temporalSummary: string; // e.g. "Incoming Chunk B is 4 years newer"
   existingChunk: ChunkMetadata;

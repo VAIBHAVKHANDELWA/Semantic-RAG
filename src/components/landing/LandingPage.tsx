@@ -124,7 +124,7 @@ export const LandingPage: React.FC = () => {
           <span className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-blue-400" /> Apache Tika Extractor</span>
           <span className="flex items-center gap-1.5"><Cpu className="w-3.5 h-3.5 text-purple-400" /> Tesseract v5 OCR</span>
           <span className="flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-cyan-400" /> MiniLM-L6-v2 Embeddings</span>
-          <span className="flex items-center gap-1.5"><Database className="w-3.5 h-3.5 text-emerald-400" /> Qdrant & Milvus Sync</span>
+          <span className="flex items-center gap-1.5"><Database className="w-3.5 h-3.5 text-emerald-400" /> PostgreSQL pgvector (HNSW)</span>
         </div>
 
         {/* Interactive Hero Preview Card */}
@@ -223,7 +223,7 @@ export const LandingPage: React.FC = () => {
               Compliance officers review side-by-side diffs. Execute one-click actions: Prune Legacy, Keep Existing, Discard Both, or Edit & Merge.
             </p>
             <div className="text-[10px] font-mono text-emerald-400 pt-2 border-t border-slate-800">
-              Qdrant & Milvus Vector Sync
+              PostgreSQL pgvector Commit
             </div>
           </div>
         </div>

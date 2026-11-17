@@ -28,4 +28,27 @@ export const verifyAuditChain = (token?: string | null): Promise<{
   headHash?: string;
   message?: string;
 }> =>
-  apiRequest('/audit/verify', {}, token || localStorage.getItem('auth_token'));
+  apiRequest('/audit/verify', {}, token || sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token'));
+
+export const fetchArchivedChunks = async (token?: string | null): Promise<any[]> => {
+  try {
+    const rawList = await apiRequest<any[]>('/chunks/archived', {}, token || sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token'));
+    if (!rawList || !Array.isArray(rawList)) return [];
+    return rawList.map(c => ({
+      id: c.id,
+      docName: c.docName || c.documentId || 'Archived_Policy.pdf',
+      docYear: c.createdAt ? new Date(c.createdAt).getFullYear() : 2026,
+      author: 'Data Steward',
+      uploadDate: c.createdAt ? String(c.createdAt).slice(0, 10) : '2026-11-15',
+      effectiveDate: c.createdAt ? `Prior to ${String(c.createdAt).slice(0, 10)}` : 'Archived',
+      temporalStatus: c.status || 'Archived',
+      text: c.chunkText || '',
+      tenantId: c.tenantId,
+      embeddingId: `emb-${c.id}`,
+      tokenCount: c.chunkText ? c.chunkText.split(/\s+/).length : 50
+    }));
+  } catch (err) {
+    console.debug('No archived chunks found:', err);
+    return [];
+  }
+};

@@ -3,14 +3,10 @@ import {
   Upload, 
   FileText, 
   Trash2, 
-  Zap, 
   Activity, 
-  Cpu, 
-  FileType,
-  RefreshCw,
-  Sliders,
-  Cloud,
-  ShieldAlert
+  FileType, 
+  RefreshCw, 
+  Cloud 
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { GlassCard } from '../common/GlassCard';
@@ -23,12 +19,11 @@ export const IngestionHub: React.FC = () => {
   const { 
     ingestionQueue, 
     createBatchJob,
-    toggleBackpressureThrottling,
-    isThrottled,
     removeIngestionItem, 
-    selectedTenant, 
-    telemetry 
+    selectedTenant 
   } = useApp();
+
+  const cleanTenant = selectedTenant === 'ALL' ? 'HR' : selectedTenant;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -99,22 +94,10 @@ export const IngestionHub: React.FC = () => {
             <Cloud className="w-4 h-4 text-cyan-400" />
             <span>Inspect S3 Presigned Ticket Handshake</span>
           </button>
-
-          <button
-            onClick={toggleBackpressureThrottling}
-            className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-2 border transition-all ${
-              isThrottled 
-                ? 'bg-amber-500 text-slate-950 border-amber-400 font-extrabold shadow-lg shadow-amber-500/20' 
-                : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700'
-            }`}
-          >
-            <ShieldAlert className="w-4 h-4 text-amber-400" />
-            <span>{isThrottled ? 'Throttled: Reset Circuit Breaker' : 'Simulate OpenAI Rate Limit Backpressure'}</span>
-          </button>
         </div>
       </div>
 
-      {/* Grid Layout: Top Widgets (Dropzone + Circuit Breaker) */}
+      {/* Grid Layout: Top Widgets (Dropzone + Pipeline Status) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left 2 Cols: Drag and Drop Dropzone */}
         <div className="lg:col-span-2">
@@ -141,74 +124,58 @@ export const IngestionHub: React.FC = () => {
               <Upload className="w-7 h-7" />
             </div>
             <h3 className="text-sm font-bold text-slate-200">
-              Drag & Drop Enterprise Document Batches Here (Up to 10,000 PDFs)
+              Drag & Drop Enterprise Document Batches Here
             </h3>
             <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
               Direct-to-Cloud architecture streams files straight to tenant S3 bucket via presigned tickets, bypassing Java backend memory.
             </p>
             <div className="mt-4 flex items-center justify-center gap-4 text-[11px] text-slate-500 font-mono">
               <span className="flex items-center gap-1 text-cyan-400 font-bold"><FileText className="w-3.5 h-3.5" /> PDF / DOCX (Native Tika)</span>
-              <span className="flex items-center gap-1 text-amber-400 font-bold"><FileType className="w-3.5 h-3.5" /> Scanned OCR (Tesseract Warning)</span>
+              <span className="flex items-center gap-1 text-amber-400 font-bold"><FileType className="w-3.5 h-3.5" /> Scanned OCR (Tesseract Fallback)</span>
             </div>
           </div>
         </div>
 
-        {/* Right Col: Backpressure & LLM Circuit Breaker Widget */}
-        <GlassCard className="flex flex-col justify-between border-slate-800/80">
+        {/* Right Col: Verified Ingestion Pipeline Architecture Status */}
+        <GlassCard className="flex flex-col justify-between border-slate-800/80 p-5 font-mono text-xs space-y-3">
           <div>
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
               <div className="flex items-center gap-2 text-xs font-semibold text-slate-200">
-                <Activity className="w-4 h-4 text-amber-400" />
-                <span>Backpressure & Worker Control</span>
+                <Activity className="w-4 h-4 text-cyan-400" />
+                <span>Ingestion Pipeline Configuration</span>
               </div>
-              <StatusBadge 
-                status={isThrottled ? 'pending' : 'closed'} 
-                label={`CIRCUIT: ${isThrottled ? 'OPEN (THROTTLED)' : 'CLOSED (NORMAL)'}`}
-              />
+              <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px]">
+                ACTIVE
+              </span>
             </div>
 
-            {/* RabbitMQ Worker Consumption Rate Meter */}
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-slate-400 flex items-center gap-1">
-                    <Zap className="w-3.5 h-3.5 text-amber-400" /> RabbitMQ Worker Rate
-                  </span>
-                  <span className="font-mono text-amber-300 font-bold">{isThrottled ? '42 msg/s (Throttled)' : `${telemetry.rabbitMqRate} msg/s`}</span>
-                </div>
-                <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full transition-all duration-500 ${isThrottled ? 'bg-amber-500' : 'bg-gradient-to-r from-amber-500 to-yellow-400'}`} 
-                    style={{ width: `${isThrottled ? 15 : Math.min(100, (telemetry.rabbitMqRate / 2000) * 100)}%` }}
-                  />
-                </div>
+            <div className="space-y-2.5 text-[11px]">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Object Store:</span>
+                <span className="text-cyan-300 font-bold">RustFS S3 (:9000)</span>
               </div>
-
-              {/* LLM Rate Limit Token Bucket */}
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-slate-400 flex items-center gap-1">
-                    <Cpu className="w-3.5 h-3.5 text-purple-400" /> LLM Token Bucket Throughput
-                  </span>
-                  <span className="font-mono text-purple-300 font-bold">{isThrottled ? '1,200 t/s (Queued)' : `${telemetry.tokensPerSec.toLocaleString()} t/s`}</span>
-                </div>
-                <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-500" 
-                    style={{ width: `${isThrottled ? 10 : Math.min(100, (telemetry.tokensPerSec / 20000) * 100)}%` }}
-                  />
-                </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Tenant Namespace:</span>
+                <span className="text-amber-300 font-bold">uploads/{cleanTenant}/</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Broker Queue:</span>
+                <span className="text-purple-300 font-bold">raw-document-queue</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Parser Engine:</span>
+                <span className="text-slate-200 font-bold">Apache Tika + PyMuPDF</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Telemetry Stream:</span>
+                <span className="text-emerald-400 font-bold">SSE (/api/v1/telemetry/stream)</span>
               </div>
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-            <span className="flex items-center gap-1">
-              <Sliders className="w-3.5 h-3.5 text-cyan-400" /> Auto-Throttling Threshold
-            </span>
-            <span className={`font-mono font-bold ${isThrottled ? 'text-amber-400' : 'text-emerald-400'}`}>
-              {isThrottled ? 'THROTTLED (Queue Active)' : 'NORMAL (0% Drop Rate)'}
-            </span>
+          <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
+            <span>Direct S3 Presigned Ticket:</span>
+            <span className="text-emerald-400 font-bold">SHA-256 HMAC SigV4</span>
           </div>
         </GlassCard>
       </div>

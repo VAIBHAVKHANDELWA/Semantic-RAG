@@ -30,7 +30,7 @@ export const QuarantineCenter: React.FC = () => {
     user
   } = useApp();
 
-  const [minSimilarity, setMinSimilarity] = useState<number>(0.80);
+  const [minSimilarity, setMinSimilarity] = useState<number>(0.85);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'RESOLVED'>('ALL');
   const [mergeModalOpen, setMergeModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,7 +77,7 @@ export const QuarantineCenter: React.FC = () => {
             Human-in-the-Loop Quarantine Resolution Center
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Reviewing semantic collisions flagged by MiniLM vector comparison (85%–97% cosine similarity range).
+            Reviewing semantic collisions flagged by pgvector & DeBERTa Cross-Encoder (threshold &tau; = 0.85).
           </p>
         </div>
 
@@ -102,11 +102,11 @@ export const QuarantineCenter: React.FC = () => {
 
           {/* Similarity Slider */}
           <div className="flex items-center gap-2 px-2">
-            <span className="text-slate-400 font-mono text-[11px]">Similarity: &gt;{(minSimilarity * 100).toFixed(0)}%</span>
+            <span className="text-slate-400 font-mono text-[11px]">Similarity: &ge;{(minSimilarity * 100).toFixed(0)}%</span>
             <input 
               type="range"
-              min="0.80"
-              max="0.95"
+              min="0.85"
+              max="0.99"
               step="0.01"
               value={minSimilarity}
               onChange={e => setMinSimilarity(parseFloat(e.target.value))}

@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import os
+import re
 import uuid
 import psycopg2
 from pgvector.psycopg2 import register_vector
@@ -12,6 +13,51 @@ logger = logging.getLogger("python-ai-engine.db")
 
 REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.environ.get("REDIS_PORT", 6379))
+
+
+def is_boilerplate(text: str) -> bool:
+    """Detects repeated template boilerplate, headers, footers, and disclaimers to prevent false collisions."""
+    if not text:
+        return True
+    t = text.strip()
+    if len(t) < 80:
+        return True
+    markers = [
+        "enterprise governance policy manual",
+        "classification: confidential",
+        "strictly internal governance only",
+        "sunset review",
+        "end of policy manual",
+        "aicpa soc 2 common criteria",
+        "principle of continuous knowledge verification",
+        "executive sponsor: enterprise executive governance",
+        "principle of least privilege and segregation of duties"
+    ]
+    t_lower = t.lower()
+    matches = sum(1 for m in markers if m in t_lower)
+    return matches >= 2
+
+
+def topics_align(doc_a: str, doc_b: str) -> bool:
+    """Verifies two documents belong to the same policy domain or revision pair before flagging collisions."""
+    if not doc_a or not doc_b:
+        return True
+    clean_a = re.sub(r'^[a-f0-9-]+_', '', doc_a.lower()).replace('.txt', '').replace('.pdf', '')
+    clean_b = re.sub(r'^[a-f0-9-]+_', '', doc_b.lower()).replace('.txt', '').replace('.pdf', '')
+    # Check matching policy/revision numbers, e.g., POL-001 and REV-001
+    nums_a = re.findall(r'(?:pol|rev)-?(\d+)', clean_a)
+    nums_b = re.findall(r'(?:pol|rev)-?(\d+)', clean_b)
+    if nums_a and nums_b and set(nums_a) & set(nums_b):
+        return True
+
+    stopwords = {
+        "hr", "fin", "finance", "leg", "legal", "eng", "engineering",
+        "pol", "rev", "policy", "governance", "standard", "manual",
+        "handbook", "and", "or", "of", "the", "for", "in", "v1", "v2", "v3"
+    }
+    toks_a = set(re.findall(r'[a-z0-9]+', clean_a)) - stopwords
+    toks_b = set(re.findall(r'[a-z0-9]+', clean_b)) - stopwords
+    return len(toks_a & toks_b) > 0
 
 
 class DatabaseService:
@@ -178,21 +224,39 @@ class DatabaseService:
                         ON CONFLICT (id) DO NOTHING;
                     """, (doc_id, sanitized_tenant, job_id, doc_name))
 
-                    # Collision Check Threshold (> 85% by default)
-                    if highest_similarity >= settings.SIMILARITY_THRESHOLD and existing_text:
-                        conflict_id = f"conf-{uuid.uuid4().hex[:8]}"
-                        
-                        # Real conflict adjudication (NLI Cross-Encoder / deterministic)
+                    # Skip collision check if either chunk is generic template boilerplate
+                    is_chunk_bp = is_boilerplate(chunk_text)
+                    is_existing_bp = is_boilerplate(existing_text) if existing_text else False
+                    same_topic = topics_align(doc_name, existing_doc) if existing_doc else False
+
+                    # Collision Check Threshold (> 85% by default) on non-boilerplate chunks with strict topic alignment
+                    should_check_collision = (
+                        not is_chunk_bp and not is_existing_bp
+                        and same_topic
+                        and highest_similarity >= settings.SIMILARITY_THRESHOLD 
+                        and existing_text
+                    )
+
+                    adjudication = None
+                    is_real_conflict = False
+                    if should_check_collision:
                         adjudication = conflict_service.adjudicate_conflict(
                             incoming_text=chunk_text,
-                            existing_text=existing_text
+                            existing_text=existing_text,
+                            tenant_id=sanitized_tenant
                         )
+                        verdict_type = adjudication.get("verdict_type", "CLEAN_APPEND")
+                        is_conflict = adjudication.get("conflict", False)
+                        is_real_conflict = same_topic and is_conflict and verdict_type in ("CONTRADICTORY", "SUPERSEDING_POLICY", "PARTIAL_UPDATE")
+
+                    if is_real_conflict and adjudication:
+                        conflict_id = f"conf-{uuid.uuid4().hex[:8]}"
                         verdict_type = adjudication.get("verdict_type", "CONTRADICTORY")
                         confidence = adjudication.get("confidence", 0.85)
                         explanation = adjudication.get("explanation", "Semantic collision detected with active tenant baseline.")
 
                         logger.warning(
-                            f"FLAGGED COLLISION ({highest_similarity*100:.1f}%) in Tenant [{sanitized_tenant}]: "
+                            f"FLAGGED REAL COLLISION ({highest_similarity*100:.1f}%) in Tenant [{sanitized_tenant}]: "
                             f"Routing incoming chunk [{chunk_id}] to Quarantine Queue with Verdict [{verdict_type}]."
                         )
 

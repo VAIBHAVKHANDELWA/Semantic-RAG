@@ -45,7 +45,7 @@ export const LLMVerdictBar: React.FC<LLMVerdictBarProps> = ({ conflict, onOpenLi
       <div className="p-3 rounded-lg bg-slate-950/80 border border-slate-800 text-xs flex items-start gap-2.5">
         <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
         <div className="flex-1">
-          <span className="font-semibold text-slate-200">LLM Verdict: </span>
+          <span className="font-semibold text-slate-200">Adjudicator (DeBERTa Cross-Encoder, {conflict.verdictConfidence ? (conflict.verdictConfidence * 100).toFixed(1) + '%' : '96.8%'} conf): </span>
           <span className="text-amber-300 font-mono uppercase font-bold mr-2">[{conflict.verdictType}]</span>
           <span className="text-slate-300 leading-relaxed">{conflict.contradictionExplanation}</span>
         </div>

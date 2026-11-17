@@ -15,7 +15,7 @@ export const OnboardingPage: React.FC = () => {
   const { user, completeOnboarding } = useApp();
 
   const [workspaceName, setWorkspaceName] = useState('Acme Enterprise Vector Guard');
-  const [targetVectorDb, setTargetVectorDb] = useState('Qdrant (Isolated HR & Legal Collection)');
+  const [targetVectorDb, setTargetVectorDb] = useState('PostgreSQL pgvector (HNSW Index, Isolated Schemas)');
   const [ingestionMode, setIngestionMode] = useState('Adaptive Chunking + MiniLM Vector Pipeline');
 
   const handleSubmit = (e: React.FormEvent) => {

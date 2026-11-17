@@ -11,6 +11,8 @@ import {
 import type { QuarantineConflict } from '../../types';
 import { motion } from 'framer-motion';
 
+import { useApp } from '../../context/AppContext';
+
 interface LlmAdjudicatorModalProps {
   conflict?: QuarantineConflict | null;
   isOpen: boolean;
@@ -18,44 +20,31 @@ interface LlmAdjudicatorModalProps {
 }
 
 export const LlmAdjudicatorModal: React.FC<LlmAdjudicatorModalProps> = ({ conflict, isOpen, onClose }) => {
+  const { conflicts } = useApp();
   const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
 
-  const defaultConflict = conflict || {
-    id: 'conf-8901',
-    similarityScore: 0.894,
-    department: 'HR',
-    verdictType: 'CONTRADICTORY',
-    contradictionExplanation: 'The 2026 framework establishes a 2-day mandatory in-office requirement, whereas the 2022 policy granted 100% full remote flexibility without office attendance.',
-    temporalSummary: 'Incoming Chunk B is 4 years newer and supersedes the 2022 policy baseline.',
-    existingChunk: {
-      id: 'chunk-a-2022',
-      docName: 'HR_Remote_Work_Policy_2022.pdf',
-      docYear: 2022,
-      author: 'Legacy HR Team',
-      uploadDate: '2022-04-12',
-      text: 'Employees may work remotely 100% of the time with zero mandatory office attendance requirement.',
-      tenantId: 'HR',
-      embeddingId: 'vec-77a8-4491-b01',
-      vectorPreview: [0.12, -0.45, 0.89],
-      tokenCount: 148
-    },
-    incomingChunk: {
-      id: 'chunk-b-2026',
-      docName: 'Global_Remote_Work_Framework_2026.pdf',
-      docYear: 2026,
-      author: 'Sarah Jenkins (VP People)',
-      uploadDate: '2026-09-07',
-      text: 'All staff must attend the local hub 2 days per week unless granted an executive medical exemption.',
-      tenantId: 'HR',
-      embeddingId: 'vec-99f2-1088-c44',
-      vectorPreview: [0.14, -0.42, 0.91],
-      tokenCount: 162
-    },
-    status: 'PENDING',
-    createdAt: '2026-09-17 18:42:15'
-  };
+  const targetConflict = conflict || conflicts.find(c => c.status === 'PENDING') || conflicts[0];
+
+  if (!targetConflict) {
+    return (
+      <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 font-sans">
+        <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center space-y-4">
+          <Brain className="w-10 h-10 text-purple-400 mx-auto" />
+          <h3 className="text-lg font-bold text-slate-100">No Conflict Selected</h3>
+          <p className="text-xs text-slate-400">
+            There are currently no active quarantined conflict pairs in the queue.
+          </p>
+          <button onClick={onClose} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-200 text-xs">
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const defaultConflict = targetConflict;
 
   const systemPrompt = `You are a strict Enterprise RAG Data Governance AI.
 Analyze Chunk A (Existing Vector DB Policy) and Chunk B (Incoming Policy Candidate).
@@ -116,7 +105,7 @@ Adjudicate logical contradiction and output governance JSON.`;
               <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
                 <span>LLM Adjudicator Prompt & Response Inspector</span>
                 <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/30 text-[10px] font-mono">
-                  GPT-4o-mini / Llama 3
+                  DeBERTa-v3-small Cross-Encoder
                 </span>
               </h3>
               <p className="text-xs text-slate-400 font-mono">
