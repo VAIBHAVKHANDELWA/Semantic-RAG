@@ -12,29 +12,25 @@ import {
   Building2,
   FileCheck,
   Activity,
-  UserCheck,
   Brain,
   Users,
   MessageSquareText,
   LogOut,
   ExternalLink,
   Key,
-  ChevronUp,
-  MoreVertical,
-  ShieldCheck
+  ChevronUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { AppLogo } from '../common/AppLogo';
 
 export const Sidebar: React.FC = () => {
-  const { activeView, setActiveView, conflicts, selectedTenant, tenants, user, logout, navigate } = useApp();
+  const { activeView, setActiveView, conflicts, selectedTenant, user, logout, navigate } = useApp();
   const [collapsed, setCollapsed] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
   const pendingConflictsCount = conflicts.filter(c => c.status === 'PENDING').length;
-  const currentTenantObj = tenants.find(t => t.code === selectedTenant);
 
   // Close profile popup on click outside
   useEffect(() => {
