@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
-  Network, 
   UploadCloud, 
   ShieldAlert, 
   GitFork, 
@@ -15,16 +14,42 @@ import {
   Activity,
   UserCheck,
   Brain,
-  Users
+  Users,
+  MessageSquareText,
+  LogOut,
+  ExternalLink,
+  Key,
+  ChevronUp,
+  MoreVertical,
+  ShieldCheck
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
+import { AppLogo } from '../common/AppLogo';
 
 export const Sidebar: React.FC = () => {
-  const { activeView, setActiveView, conflicts, selectedTenant, tenants, user } = useApp();
+  const { activeView, setActiveView, conflicts, selectedTenant, tenants, user, logout, navigate } = useApp();
   const [collapsed, setCollapsed] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
 
   const pendingConflictsCount = conflicts.filter(c => c.status === 'PENDING').length;
   const currentTenantObj = tenants.find(t => t.code === selectedTenant);
+
+  // Close profile popup on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    if (profileOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [profileOpen]);
 
   // Dynamic Navigation Items based on user.role
   const getNavItems = () => {
@@ -39,6 +64,13 @@ export const Sidebar: React.FC = () => {
             icon: ShieldAlert,
             badge: pendingConflictsCount > 0 ? pendingConflictsCount : undefined,
             badgeColor: 'bg-amber-500 text-slate-950 font-bold'
+          },
+          {
+            id: 'rag_chat',
+            label: 'Ask the Policies (RAG)',
+            icon: MessageSquareText,
+            badge: 'Active Only',
+            badgeColor: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
           },
           {
             id: 'ingestion',
@@ -77,6 +109,13 @@ export const Sidebar: React.FC = () => {
             icon: Activity
           },
           {
+            id: 'rag_chat',
+            label: 'Ask the Policies (RAG)',
+            icon: MessageSquareText,
+            badge: 'Active Only',
+            badgeColor: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+          },
+          {
             id: 'user_mgmt',
             label: 'User Governance',
             icon: Users
@@ -113,6 +152,13 @@ export const Sidebar: React.FC = () => {
             badgeColor: 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
           },
           {
+            id: 'rag_chat',
+            label: 'Ask the Policies (RAG)',
+            icon: MessageSquareText,
+            badge: 'Active Only',
+            badgeColor: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+          },
+          {
             id: 'analytics',
             label: 'DBSCAN Topic Clusters',
             icon: BarChart3
@@ -143,21 +189,9 @@ export const Sidebar: React.FC = () => {
       {/* Top Section: App Logo & Collapse Toggle */}
       <div>
         <div className="h-16 border-b border-slate-800/80 px-4 flex items-center justify-between">
-          {!collapsed ? (
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-700 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-                <Network className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-sm font-bold tracking-wider text-slate-100 uppercase">Semantic RAG</h1>
-                <p className="text-[10px] text-cyan-400 font-mono tracking-tight">PRUNING ENGINE</p>
-              </div>
-            </div>
-          ) : (
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-700 flex items-center justify-center mx-auto shadow-lg shadow-cyan-500/20">
-              <Network className="w-5 h-5 text-white" />
-            </div>
-          )}
+          <div className="flex items-center overflow-hidden">
+            <AppLogo size="sm" showWordmark={!collapsed} subtitle="ENTERPRISE SENTINEL" />
+          </div>
 
           <button
             onClick={() => setCollapsed(!collapsed)}
@@ -167,20 +201,8 @@ export const Sidebar: React.FC = () => {
           </button>
         </div>
 
-        {/* Persona Indicator Banner */}
-        {!collapsed && user && (
-          <div className="mx-3 mt-3 p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/90 flex items-center justify-between text-xs font-mono">
-            <span className="text-slate-400 font-bold flex items-center gap-1.5">
-              <UserCheck className="w-3.5 h-3.5 text-cyan-400" /> {user.role}
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
-              {user.tenant}
-            </span>
-          </div>
-        )}
-
         {/* Role-Driven Navigation Items */}
-        <nav className="p-3 space-y-1.5 mt-1">
+        <nav className="p-3 space-y-1.5 mt-2">
           {navItems.map(item => {
             const Icon = item.icon;
             const isActive = activeView === item.id;
@@ -188,14 +210,14 @@ export const Sidebar: React.FC = () => {
               <button
                 key={item.id}
                 onClick={() => setActiveView(item.id as any)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all group relative ${
                   isActive 
-                    ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 shadow-md shadow-cyan-500/5 font-bold' 
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                    ? 'bg-gradient-to-r from-cyan-500/15 via-blue-500/10 to-transparent text-cyan-200 border-l-2 border-cyan-400 font-bold shadow-sm' 
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/70 hover:translate-x-0.5'
                 }`}
                 title={collapsed ? item.label : undefined}
               >
-                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-cyan-400' : 'text-slate-400'}`} />
+                <Icon className={`w-4 h-4 shrink-0 transition-transform ${isActive ? 'text-cyan-400 drop-shadow-[0_0_6px_rgba(6,182,212,0.5)]' : 'text-slate-400 group-hover:text-slate-200'}`} />
                 {!collapsed && <span className="flex-1 text-left">{item.label}</span>}
                 {!collapsed && item.badge !== undefined && (
                   <span className={`px-2 py-0.5 rounded-full text-[10px] ${item.badgeColor}`}>
@@ -211,26 +233,132 @@ export const Sidebar: React.FC = () => {
         </nav>
       </div>
 
-      {/* Bottom Section: Active Tenant Isolation Status & Debug Persona Switcher */}
-      <div className="p-3 border-t border-slate-800/80 bg-slate-950/60 space-y-2">
+      {/* Bottom Section: User Profile & Scope Isolation */}
+      <div className="p-3 border-t border-slate-800/80 bg-slate-950/90 space-y-2 relative" ref={profileRef}>
+        {/* Scope Isolation status */}
         {!collapsed ? (
-          <>
-            <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800/80">
-              <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
-                <span className="flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-emerald-400" /> Scope Isolation
-                </span>
-                <span className="text-[10px] font-mono text-emerald-400">ACTIVE</span>
-              </div>
-              <div className="mt-1 text-[10px] text-slate-400 font-mono truncate">
-                {selectedTenant === 'ALL' ? 'Global Multi-Tenant' : currentTenantObj?.isolationLevel}
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-emerald-400">
-            <Lock className="w-4 h-4" />
+          <div className="px-2.5 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800/60 flex items-center justify-between text-[11px]">
+            <span className="flex items-center gap-1.5 text-slate-400 font-medium">
+              <Lock className="w-3 h-3 text-emerald-400" />
+              <span className="truncate max-w-[120px]">{selectedTenant === 'ALL' ? 'Global Scope' : `${selectedTenant} Scope`}</span>
+            </span>
+            <span className="text-[10px] font-mono text-emerald-400 font-semibold">ACTIVE</span>
           </div>
+        ) : null}
+
+        {/* User Profile Trigger Button */}
+        {user ? (
+          <div className="relative">
+            <button
+              onClick={() => setProfileOpen(!profileOpen)}
+              className={`w-full flex items-center rounded-xl transition-all cursor-pointer ${
+                collapsed 
+                  ? 'justify-center p-2 hover:bg-slate-900 border border-transparent hover:border-slate-800' 
+                  : 'gap-2.5 p-2 bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-cyan-500/40 text-left'
+              } ${profileOpen ? 'border-cyan-500/50 ring-1 ring-cyan-500/30' : ''}`}
+              title={collapsed ? `${user.name} (${user.role})` : undefined}
+            >
+              {/* Circular Avatar with Active Pulse */}
+              <div className="relative shrink-0">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-700 text-slate-950 font-extrabold flex items-center justify-center text-xs shadow-md shadow-cyan-500/20">
+                  {user.name.slice(0, 1)}
+                </div>
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 border-2 border-slate-950 rounded-full" />
+              </div>
+
+              {!collapsed && (
+                <>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-bold text-slate-200 truncate leading-tight">
+                      {user.name}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-mono truncate leading-tight mt-0.5">
+                      <span className="text-cyan-400 font-semibold">{user.tenant}</span> • {user.role}
+                    </div>
+                  </div>
+                  <ChevronUp className={`w-3.5 h-3.5 text-slate-400 transition-transform ${profileOpen ? 'rotate-180 text-cyan-400' : ''}`} />
+                </>
+              )}
+            </button>
+
+            {/* Profile Popover Menu */}
+            <AnimatePresence>
+              {profileOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.96 }}
+                  transition={{ duration: 0.15 }}
+                  className={`absolute z-50 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden py-1 ${
+                    collapsed 
+                      ? 'left-full ml-3 bottom-0 w-72' 
+                      : 'left-0 right-0 bottom-full mb-2 w-full min-w-[240px]'
+                  }`}
+                >
+                  {/* Profile Header Details */}
+                  <div className="p-3.5 bg-slate-950/80 border-b border-slate-800/80 space-y-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-700 text-slate-950 font-extrabold flex items-center justify-center text-sm shadow-md shadow-cyan-500/20 shrink-0">
+                        {user.name.slice(0, 1)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-slate-100 text-xs truncate">{user.name}</div>
+                        <div className="text-[11px] text-slate-400 font-mono truncate">
+                          {user.email || `${user.id.toLowerCase()}@enterprise.com`}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 pt-1">
+                      <span className="px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono font-bold">
+                        {user.tenant}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 text-[10px] font-mono font-bold">
+                        {user.role}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-mono pt-0.5">
+                      <Key className="w-3 h-3 shrink-0" />
+                      <span>Real Session Active • Signed JWT</span>
+                    </div>
+                  </div>
+
+                  {/* Actions: Workspace Config & Sign Out */}
+                  <div className="p-2 space-y-1 text-xs">
+                    <button
+                      onClick={() => {
+                        setProfileOpen(false);
+                        navigate('/onboarding');
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-800/80 text-slate-300 flex items-center gap-2.5 transition-colors cursor-pointer"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-cyan-400" />
+                      <span className="font-medium">Workspace Config</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setProfileOpen(false);
+                        logout();
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-rose-500/10 text-rose-400 flex items-center gap-2.5 transition-colors cursor-pointer font-medium"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Sign Out (Switch Account)</span>
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        ) : (
+          <button
+            onClick={() => navigate('/login')}
+            className="w-full py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold transition-all text-center block"
+          >
+            {collapsed ? 'In' : 'Sign In'}
+          </button>
         )}
       </div>
     </aside>

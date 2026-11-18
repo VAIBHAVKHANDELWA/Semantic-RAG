@@ -24,6 +24,7 @@ import { fetchPendingConflicts, resolveConflict as apiResolveConflict } from '..
 import { fetchAuditLogs } from '../api/audit';
 import { fetchClusters } from '../api/clusters';
 import { getUploadTicket, uploadFileToS3, completeIngestion, fetchIngestionJobs } from '../api/ingestion';
+import { fetchWorkspaceConfig, saveWorkspaceConfig } from '../api/workspace';
 
 const DEFAULT_TENANTS: Tenant[] = [
   { id: 'HR', name: 'Human Resources & People Ops', code: 'HR', isolationLevel: 'PostgreSQL RLS / pgvector Namespace', activeConflictsCount: 0, totalIngestedDocs: 15 },
@@ -78,7 +79,13 @@ interface AppContextType {
 
   // Onboarding Config
   workspaceConfig: WorkspaceConfig;
-  completeOnboarding: (workspaceName: string, targetVectorDb: string, ingestionMode: string) => void;
+  completeOnboarding: (
+    workspaceName: string,
+    targetVectorDb: string,
+    ingestionMode: string,
+    vectorDbEndpoint?: string,
+    vectorDbApiKey?: string
+  ) => Promise<void> | void;
 
   // Tenant isolation scope
   selectedTenant: TenantScope;
@@ -177,7 +184,7 @@ function getInitialAuth(): { token: string | null; user: User | null } {
 }
 
 const DEFAULT_WORKSPACE: WorkspaceConfig = {
-  workspaceName: 'Enterprise Semantic RAG Guard',
+  workspaceName: 'VectorGuard Enterprise Workspace',
   targetVectorDb: 'PostgreSQL + pgvector (384-dim HNSW)',
   ingestionMode: 'Adaptive Chunking + MiniLM Vector Pipeline'
 };
@@ -545,19 +552,76 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const completeOnboarding = (workspaceName: string, targetVectorDb: string, ingestionMode: string) => {
-    setWorkspaceConfig({
-      workspaceName,
-      targetVectorDb,
-      ingestionMode
-    });
-    addToast({
-      type: 'success',
-      title: 'Workspace Initialized',
-      description: `"${workspaceName}" target set to ${targetVectorDb}.`
-    });
+  const completeOnboarding = async (
+    workspaceName: string,
+    targetVectorDb: string,
+    ingestionMode: string,
+    vectorDbEndpoint?: string,
+    vectorDbApiKey?: string
+  ) => {
+    try {
+      const activeToken = token || sessionStorage.getItem('auth_token');
+      await saveWorkspaceConfig({
+        workspaceName,
+        targetVectorDb,
+        chunkingStrategy: ingestionMode,
+        vectorDbEndpoint,
+        vectorDbApiKey
+      }, activeToken);
+
+      setWorkspaceConfig(prev => ({
+        ...prev,
+        workspaceName,
+        targetVectorDb,
+        ingestionMode,
+        vectorDbEndpoint
+      }));
+
+      addToast({
+        type: 'success',
+        title: 'Workspace Initialized & Applied',
+        description: `"${workspaceName}" configured with ${targetVectorDb}.`
+      });
+    } catch (err: any) {
+      console.warn("Could not save to backend, applying locally", err);
+      setWorkspaceConfig(prev => ({
+        ...prev,
+        workspaceName,
+        targetVectorDb,
+        ingestionMode
+      }));
+      addToast({
+        type: 'amber',
+        title: 'Workspace Configuration Updated',
+        description: `Configuration applied: ${workspaceName}`
+      });
+    }
     navigate('/dashboard');
   };
+
+  // Synchronize workspace configuration on mount or auth change
+  useEffect(() => {
+    const activeToken = token || sessionStorage.getItem('auth_token');
+    if (!activeToken) return;
+    fetchWorkspaceConfig(activeToken)
+      .then(cfg => {
+        if (cfg && cfg.workspaceName) {
+          setWorkspaceConfig({
+            workspaceName: cfg.workspaceName,
+            targetVectorDb: cfg.targetVectorDb,
+            ingestionMode: cfg.chunkingStrategy,
+            vectorDbEndpoint: cfg.vectorDbEndpoint || undefined,
+            vectorDbStatus: cfg.vectorDbStatus,
+            vectorDbLatencyMs: cfg.vectorDbLatencyMs || undefined,
+            activeHnswIndex: cfg.activeHnswIndex,
+            dimension: cfg.dimension
+          });
+        }
+      })
+      .catch(err => {
+        console.debug("Could not fetch initial workspace config:", err);
+      });
+  }, [token, isAuthenticated]);
 
   // Real telemetry and event updates driven via SSE EventSource with automatic reconnection
   useEffect(() => {
@@ -641,7 +705,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .catch(err => console.debug('Could not fetch real telemetry stats:', err));
 
     // Fetch real pending conflicts
-    fetchPendingConflicts(userToken)
+    fetchPendingConflicts(userToken, user?.role === 'SYSTEM_ADMIN' ? selectedTenant : undefined)
       .then(confList => {
         if (confList && Array.isArray(confList)) {
           setConflicts(confList);
@@ -701,7 +765,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (reconnectTimer) clearTimeout(reconnectTimer);
       eventSource?.close();
     };
-  }, [user?.token, user?.tenant, token]);
+  }, [user?.token, user?.tenant, token, selectedTenant]);
 
   // Fetch real ingestion jobs from backend on auth change
   useEffect(() => {

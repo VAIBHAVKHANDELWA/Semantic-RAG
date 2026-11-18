@@ -105,6 +105,33 @@ Updated at: 2026-11-17T22:48:00+05:30.
 
 ---
 
+## 6. Current-Policy-Only RAG Chatbot Acceptance Verification Ledger
+
+### Core Rule Enforcement
+The chatbot operates under a non-negotiable architectural invariant: answers and sources must be retrieved **ONLY** from vector chunks whose `status = 'ACTIVE'` for the authenticated caller's tenant. Archived (`status = 'ARCHIVED'`), superseded, or pending quarantined chunks are mathematically excluded at the SQL filter level (`WHERE vc.status = 'ACTIVE' AND vc.tenant_id = :tenant`).
+
+### Live Verification Matrix (4-Step Acceptance Protocol)
+
+| State / Trigger | Test Question | Live RAG Extractive Answer | Policy in Force Citation | Verified Sources (status = 'ACTIVE') | Invariant Verdict |
+|---|---|---|---|---|:---:|
+| **State (a)**: Baseline active, 2026 amendment pending in quarantine | *"How many days can employees work from home?"* | *"Section 3.1: All corporate personnel are entitled to full remote flexibility with up to 100% remote hours, with zero mandatory in-person office attendance requirements for roles classified as distributed."* | `HR-POL-001` v1.0 (2024-01-01) | `chk-hr-001-base` (v1.0, 2024-01-01) | **PASS (OLD POLICY ONLY)** |
+| **State (a)**: Baseline active, 2026 amendment pending in quarantine | *"What is the annual overtime cap?"* | *"Overtime compensation is paid at 1.5x hourly rate for all non-exempt staff with an annual overtime ceiling of 350 hours per fiscal year."* | `HR-POL-002` v1.0 (2024-01-01) | `chk-17152417` (v1.0, 2024-01-01) | **PASS (OLD POLICY ONLY)** |
+| **State (a)**: Baseline active, 2026 amendment pending in quarantine | *"What is the employee referral bonus payout amount?"* | *"Employee referral bonuses of $5,000 shall be disbursed immediately upon 90 days of successful employee tenure without exceptions."* | `HR-POL-003` v1.0 (2024-01-01) | `chk-0226152d` (v1.0, 2024-01-01) | **PASS (OLD POLICY ONLY)** |
+| **Action**: Steward resolves `conf-hr-001` with `PROMOTED_INCOMING` | Reason: *"Corporate executive transition to hybrid office standard (4 days/wk)"* | `conf-hr-001` status &rarr; `PROMOTED_INCOMING`; `chk-hr-001-base` soft-archived (`status='ARCHIVED'`); new chunk `chk-prom-conf-hr-001` embedded & activated (`status='ACTIVE'`); Redis cache invalidated (`tenant:HR:policy_version` incremented). | N/A | Provenance edge recorded (`SUPERSEDES`); SHA-256 audit entry logged. | **PASS** |
+| **State (b)**: After Promotion (New policy ACTIVE, old baseline ARCHIVED) | *"How many days can employees work from home?"* | *"Executive Directive 2026-04: All corporate employees are required to report to physical enterprise office premises a minimum of 4 days per week."* | `doc-hr-001` v2.0 (2026-04-01) | `chk-prom-conf-hr-001` (v2.0, 2026-04-01) | **PASS (NEW POLICY ONLY - 0 Trace of Old)** |
+| **State (b)**: Unresolved policies remain baseline | *"What is the annual overtime cap?"* | *"Overtime compensation is paid at 1.5x hourly rate for all non-exempt staff with an annual overtime ceiling of 350 hours per fiscal year."* | `HR-POL-002` v1.0 (2024-01-01) | `chk-17152417` (v1.0, 2024-01-01) | **PASS (OLD POLICY ONLY)** |
+| **Action**: Steward resolves `conf-hr-002` with `KEEP_EXISTING` | Reason: *"Retaining 350-hour baseline overtime cap; rejecting proposed reduction"* | `conf-hr-002` status &rarr; `KEEP_EXISTING`; document marked `ARCHIVED`; incoming amendment permanently rejected; Redis cache invalidated. | N/A | Provenance edge recorded (`CONTRADICTS`); SHA-256 audit entry logged. | **PASS** |
+| **State (c)**: After Keep Existing (Old stays ACTIVE, incoming rejected) | *"What is the annual overtime cap?"* | *"Overtime compensation is paid at 1.5x hourly rate for all non-exempt staff with an annual overtime ceiling of 350 hours per fiscal year."* | `HR-POL-002` v1.0 (2024-01-01) | `chk-17152417` (v1.0, 2024-01-01) | **PASS (STAYS OLD POLICY)** |
+
+### Architectural Verification Summary
+1. **Zero Hallucination / Extractive Guarantee**: Extractive sentence ranking using `all-MiniLM-L6-v2` cosine similarity (`sentence_transformers.util.cos_sim`) extracts only verified clauses directly present in active pgvector chunks.
+2. **Version Deduplication Safety Net**: If two retrieved chunks match the same document family/policy topic, the retrieval pipeline discards older versions and preserves strictly the latest active effective date.
+3. **Pending Quarantine Awareness Outside the Answer**: Live badge `"{N} pending update in quarantine (not used in answers)"` displayed in UI header and telemetry without polluting or altering the answer text.
+4. **Cache Invalidation Lifecycle**: Redis key `rag:chat:{tenant}:{version}:{sha256(q)}` is systematically cleared and incremented on every quarantine promotion and resolution event.
+
+---
+
 **OVERALL DEMO READINESS: 100% READY FOR PRESENTATION**
+
 
 

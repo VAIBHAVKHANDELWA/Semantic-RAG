@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.charset.StandardCharsets;
@@ -34,9 +35,13 @@ public class GovernanceService {
     private final ProvenanceEdgeRepository provenanceRepository;
     private final VectorChunkRepository vectorChunkRepository;
     private final SseConnectionManager sseConnectionManager;
+    private final RestTemplate restTemplate = new RestTemplate();
 
     @Transactional(readOnly = true)
     public List<QuarantineConflict> getPendingConflicts(String tenantId) {
+        if (tenantId == null || "ALL".equalsIgnoreCase(tenantId)) {
+            return conflictRepository.findByStatusOrderByCreatedAtDesc("PENDING");
+        }
         return conflictRepository.findByTenantIdAndStatusOrderByCreatedAtDesc(tenantId, "PENDING");
     }
 
@@ -76,13 +81,36 @@ public class GovernanceService {
         conflictRepository.save(conflict);
 
         // Soft-archive existing vector chunk when incoming policy is promoted
-        if ("PROMOTED_INCOMING".equals(normalizedAction) && conflict.getExistingChunkId() != null) {
-            vectorChunkRepository.findById(conflict.getExistingChunkId()).ifPresent(chunk -> {
-                chunk.setStatus("ARCHIVED");
-                chunk.setSupersededBy(conflict.getId());
-                vectorChunkRepository.save(chunk);
-                log.info("Soft-archived superseded vector chunk [{}] in PostgreSQL pgvector", chunk.getId());
-            });
+        if ("PROMOTED_INCOMING".equals(normalizedAction)) {
+            if (conflict.getExistingChunkId() != null) {
+                vectorChunkRepository.findById(conflict.getExistingChunkId()).ifPresent(chunk -> {
+                    chunk.setStatus("ARCHIVED");
+                    chunk.setSupersededBy(conflict.getId());
+                    vectorChunkRepository.save(chunk);
+                    log.info("Soft-archived superseded vector chunk [{}] in PostgreSQL pgvector", chunk.getId());
+                });
+            }
+            try {
+                restTemplate.postForEntity(
+                        "http://localhost:8000/api/v1/quarantine/promote",
+                        Map.of("conflictId", conflictId, "tenantId", tenantId),
+                        Map.class
+                );
+                log.info("Notified Python AI Engine of conflict [{}] promotion for tenant [{}]", conflictId, tenantId);
+            } catch (Exception e) {
+                log.warn("Failed to notify Python AI Engine of conflict promotion: {}", e.getMessage());
+            }
+        } else if ("KEEP_EXISTING".equals(normalizedAction) || "REJECT_INCOMING".equals(normalizedAction)) {
+            try {
+                restTemplate.postForEntity(
+                        "http://localhost:8000/api/v1/quarantine/keep",
+                        Map.of("conflictId", conflictId, "tenantId", tenantId),
+                        Map.class
+                );
+                log.info("Notified Python AI Engine of conflict [{}] keep/rejection for tenant [{}]", conflictId, tenantId);
+            } catch (Exception e) {
+                log.warn("Failed to notify Python AI Engine of conflict keep: {}", e.getMessage());
+            }
         }
 
         // 1. Provenance edge
@@ -217,7 +245,7 @@ public class GovernanceService {
     private String mapActionToRelation(String action) {
         return switch (action) {
             case "PROMOTED_INCOMING" -> "SUPERSEDES";
-            case "KEEP_EXISTING" -> "REJECTED_AS_CONTRADICTORY";
+            case "KEEP_EXISTING", "REJECT_INCOMING" -> "CONTRADICTS";
             case "MANUALLY_MERGED" -> "PARTIAL_UPDATE_OF";
             default -> "DERIVED_FROM";
         };

@@ -60,8 +60,9 @@ export function normalizeConflict(raw: any): QuarantineConflict {
   };
 }
 
-export const fetchPendingConflicts = async (token?: string | null): Promise<QuarantineConflict[]> => {
-  const rawList = await apiRequest<any[]>('/quarantine/pending', {}, token || localStorage.getItem('auth_token'));
+export const fetchPendingConflicts = async (token?: string | null, tenant?: string): Promise<QuarantineConflict[]> => {
+  const query = tenant && tenant !== 'ALL' ? `?tenant=${encodeURIComponent(tenant)}` : '';
+  const rawList = await apiRequest<any[]>(`/quarantine/pending${query}`, {}, token || localStorage.getItem('auth_token'));
   return (rawList || []).map(normalizeConflict);
 };
 

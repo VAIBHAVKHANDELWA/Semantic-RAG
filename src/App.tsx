@@ -11,6 +11,7 @@ import { OnboardingPage } from './components/auth/OnboardingPage';
 import { Unauthorized403 } from './components/auth/Unauthorized403';
 import { RoleGuard } from './components/auth/RoleGuard';
 import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeModal';
+import { FloatingChatWidget } from './components/chat/FloatingChatWidget';
 
 const MainDashboardLayout: React.FC = () => {
   return (
@@ -31,6 +32,7 @@ const MainDashboardLayout: React.FC = () => {
       <ToastContainer />
       <LineageGraphModal />
       <ForcePasswordChangeModal />
+      <FloatingChatWidget />
     </div>
   );
 };

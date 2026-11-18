@@ -1,8 +1,8 @@
 import React from 'react';
-import { 
-  Zap, 
-  ShieldAlert, 
-  Activity, 
+import {
+  Zap,
+  ShieldAlert,
+  Activity,
   Terminal,
   Layers,
   FileType,
@@ -61,9 +61,8 @@ export const BatchIngestionTracker: React.FC = () => {
               {/* Job Header */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
                 <div className="flex items-center gap-3">
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs ${
-                    job.backpressureActive ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30'
-                  }`}>
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs ${job.backpressureActive ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30'
+                    }`}>
                     <Layers className="w-5 h-5" />
                   </div>
                   <div>
@@ -88,8 +87,8 @@ export const BatchIngestionTracker: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2 font-mono text-xs">
-                  <StatusBadge 
-                    status={job.backpressureActive ? 'pending' : job.progressPercentage >= 100 ? 'clean' : 'native'} 
+                  <StatusBadge
+                    status={job.backpressureActive ? 'pending' : job.progressPercentage >= 100 ? 'clean' : 'native'}
                     label={job.status.replace(/_/g, ' ')}
                   />
                 </div>
@@ -106,12 +105,11 @@ export const BatchIngestionTracker: React.FC = () => {
                 </div>
 
                 <div className="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
-                  <div 
-                    className={`h-full rounded-full transition-all duration-500 ${
-                      job.backpressureActive 
-                        ? 'bg-gradient-to-r from-amber-500 to-rose-500' 
-                        : 'bg-gradient-to-r from-cyan-500 via-blue-500 to-emerald-400'
-                    }`}
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${job.backpressureActive
+                      ? 'bg-gradient-to-r from-amber-500 to-rose-500'
+                      : 'bg-gradient-to-r from-cyan-500 via-blue-500 to-emerald-400'
+                      }`}
                     style={{ width: `${job.progressPercentage}%` }}
                   />
                 </div>

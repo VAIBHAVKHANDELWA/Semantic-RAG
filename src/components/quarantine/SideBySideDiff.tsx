@@ -14,28 +14,28 @@ export const SideBySideDiff: React.FC<SideBySideDiffProps> = ({ existingChunk, i
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Left Card: Existing Chunk A (Legacy Vector Store Candidate) */}
-      <div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-5 space-y-4 relative overflow-hidden">
+      <div className="rounded-2xl bg-slate-900/85 border border-slate-800 hover:border-slate-700/80 p-5 space-y-4 relative overflow-hidden shadow-xl">
         {/* Top Header Badge */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
               Existing Vector Chunk A (In Vector DB)
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold flex items-center gap-1">
+            <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold flex items-center gap-1">
               <CheckCircle2 className="w-3 h-3 text-emerald-400" />
               {existingChunk.temporalStatus || 'Active'}
             </span>
-            <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-mono">
+            <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-mono">
               {existingChunk.docYear} Baseline
             </span>
           </div>
         </div>
 
         {/* Document Metadata Grid */}
-        <div className="grid grid-cols-2 gap-2 text-xs bg-slate-950/60 p-3 rounded-xl border border-slate-800/60 font-mono">
+        <div className="grid grid-cols-2 gap-2 text-xs bg-slate-950/80 p-3 rounded-xl border border-slate-800/80 font-mono">
           <div>
             <div className="text-[10px] text-slate-500 flex items-center gap-1">
               <FileText className="w-3 h-3 text-cyan-400" /> Source Doc
@@ -70,7 +70,7 @@ export const SideBySideDiff: React.FC<SideBySideDiffProps> = ({ existingChunk, i
               <ArrowDownRight className="w-3 h-3" /> Flagged Superseded Terms
             </span>
           </div>
-          <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 font-mono leading-relaxed min-h-[140px] whitespace-pre-wrap">
+          <div className="p-4 rounded-xl bg-slate-950/90 border border-slate-800/90 text-xs text-slate-200 font-mono leading-relaxed min-h-[140px] whitespace-pre-wrap selection:bg-rose-500/30">
             {isAdmin ? (
               <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 font-mono text-xs flex items-center justify-center gap-2 h-28 text-center">
                 <Lock className="w-5 h-5 text-amber-400 shrink-0" />
@@ -108,28 +108,28 @@ export const SideBySideDiff: React.FC<SideBySideDiffProps> = ({ existingChunk, i
       </div>
 
       {/* Right Card: Incoming Chunk B (Fresh Upload Candidate) */}
-      <div className="rounded-2xl bg-slate-900/80 border border-cyan-500/30 p-5 space-y-4 relative overflow-hidden glow-cyan">
+      <div className="rounded-2xl bg-gradient-to-b from-slate-900 to-slate-900/95 border border-cyan-500/40 p-5 space-y-4 relative overflow-hidden shadow-xl shadow-cyan-500/5 ring-1 ring-cyan-500/20">
         {/* Top Header Badge */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
+            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-sm shadow-cyan-400" />
             <span className="text-xs font-bold uppercase tracking-wider text-cyan-300">
               Incoming Chunk B (Quarantined Pipeline)
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] font-mono font-bold flex items-center gap-1">
+            <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold flex items-center gap-1">
               <ShieldAlert className="w-3 h-3 text-amber-400" />
               {incomingChunk.temporalStatus || 'Quarantined'}
             </span>
-            <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 text-[10px] font-mono">
+            <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono">
               {incomingChunk.docYear} Revision
             </span>
           </div>
         </div>
 
         {/* Document Metadata Grid */}
-        <div className="grid grid-cols-2 gap-2 text-xs bg-slate-950/60 p-3 rounded-xl border border-slate-800/60 font-mono">
+        <div className="grid grid-cols-2 gap-2 text-xs bg-slate-950/80 p-3 rounded-xl border border-cyan-500/20 font-mono">
           <div>
             <div className="text-[10px] text-slate-500 flex items-center gap-1">
               <FileText className="w-3 h-3 text-cyan-400" /> Source Doc
@@ -164,7 +164,7 @@ export const SideBySideDiff: React.FC<SideBySideDiffProps> = ({ existingChunk, i
               <ArrowUpRight className="w-3 h-3" /> Proposed Policy Additions
             </span>
           </div>
-          <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 font-mono leading-relaxed min-h-[140px] whitespace-pre-wrap">
+          <div className="p-4 rounded-xl bg-slate-950/90 border border-cyan-500/30 text-xs text-slate-100 font-mono leading-relaxed min-h-[140px] whitespace-pre-wrap selection:bg-cyan-500/30">
             {isAdmin ? (
               <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 font-mono text-xs flex items-center justify-center gap-2 h-28 text-center">
                 <Lock className="w-5 h-5 text-amber-400 shrink-0" />
