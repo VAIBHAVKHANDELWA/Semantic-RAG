@@ -1,12 +1,12 @@
 import React, { useRef, useState } from 'react';
-import { 
-  Upload, 
-  FileText, 
-  Trash2, 
-  Activity, 
-  FileType, 
-  RefreshCw, 
-  Cloud 
+import {
+  Upload,
+  FileText,
+  Trash2,
+  Activity,
+  FileType,
+  RefreshCw,
+  Cloud
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { GlassCard } from '../common/GlassCard';
@@ -16,11 +16,11 @@ import { BatchIngestionTracker } from './BatchIngestionTracker';
 import { motion } from 'framer-motion';
 
 export const IngestionHub: React.FC = () => {
-  const { 
-    ingestionQueue, 
+  const {
+    ingestionQueue,
     createBatchJob,
-    removeIngestionItem, 
-    selectedTenant 
+    removeIngestionItem,
+    selectedTenant
   } = useApp();
 
   const cleanTenant = selectedTenant === 'ALL' ? 'HR' : selectedTenant;
@@ -106,18 +106,17 @@ export const IngestionHub: React.FC = () => {
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 relative overflow-hidden ${
-              isDragging 
-                ? 'border-cyan-400 bg-cyan-500/10 glow-cyan' 
-                : 'border-slate-800 hover:border-slate-700 bg-slate-900/40 hover:bg-slate-900/70'
-            }`}
+            className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 relative overflow-hidden ${isDragging
+              ? 'border-cyan-400 bg-cyan-500/10 glow-cyan'
+              : 'border-slate-800 hover:border-slate-700 bg-slate-900/40 hover:bg-slate-900/70'
+              }`}
           >
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={handleFileChange} 
-              multiple 
-              className="hidden" 
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              multiple
+              className="hidden"
               accept=".pdf,.docx,.doc,.png,.jpg,.jpeg"
             />
             <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mx-auto text-cyan-400 shadow-lg shadow-cyan-500/10 mb-4">
@@ -249,10 +248,9 @@ export const IngestionHub: React.FC = () => {
 
                   {/* Stage */}
                   <td className="py-3.5 px-4">
-                    <span className={`font-semibold ${
-                      item.stage === 'QUARANTINED' ? 'text-amber-400' :
+                    <span className={`font-semibold ${item.stage === 'QUARANTINED' ? 'text-amber-400' :
                       item.stage === 'IN_VECTOR_DB' ? 'text-emerald-400' : 'text-cyan-400'
-                    }`}>
+                      }`}>
                       {getStageLabel(item.stage)}
                     </span>
                   </td>
@@ -261,11 +259,10 @@ export const IngestionHub: React.FC = () => {
                   <td className="py-3.5 px-4 w-44">
                     <div className="flex items-center gap-2">
                       <div className="h-1.5 flex-1 bg-slate-800 rounded-full overflow-hidden">
-                        <motion.div 
-                          className={`h-full rounded-full ${
-                            item.stage === 'QUARANTINED' ? 'bg-amber-400' :
+                        <motion.div
+                          className={`h-full rounded-full ${item.stage === 'QUARANTINED' ? 'bg-amber-400' :
                             item.stage === 'IN_VECTOR_DB' ? 'bg-emerald-400' : 'bg-cyan-400'
-                          }`} 
+                            }`}
                           animate={{ width: `${item.progressPercentage}%` }}
                           transition={{ duration: 0.5 }}
                         />

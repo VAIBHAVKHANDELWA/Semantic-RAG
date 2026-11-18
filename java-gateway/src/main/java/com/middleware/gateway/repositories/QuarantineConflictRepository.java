@@ -10,6 +10,7 @@ import java.util.Optional;
 @Repository
 public interface QuarantineConflictRepository extends JpaRepository<QuarantineConflict, String> {
     List<QuarantineConflict> findByTenantIdAndStatusOrderByCreatedAtDesc(String tenantId, String status);
+    List<QuarantineConflict> findByStatusOrderByCreatedAtDesc(String status);
     Optional<QuarantineConflict> findByIdAndTenantId(String id, String tenantId);
     long countByTenantIdAndStatus(String tenantId, String status);
 }

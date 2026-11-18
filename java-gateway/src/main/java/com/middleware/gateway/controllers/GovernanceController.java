@@ -39,12 +39,20 @@ public class GovernanceController {
 
     /**
      * Endpoint 1: GET /api/v1/quarantine/pending
-     * Retrieves all pending quarantine conflicts strictly isolated to the user's tenant.
+     * Retrieves all pending quarantine conflicts strictly isolated to the user's tenant (or all for SYSTEM_ADMIN).
      */
     @GetMapping("/quarantine/pending")
     @PreAuthorize("hasAnyRole('DATA_STEWARD', 'SYSTEM_ADMIN')")
-    public ResponseEntity<List<QuarantineConflict>> getPendingConflicts(Authentication authentication) {
+    public ResponseEntity<List<QuarantineConflict>> getPendingConflicts(
+            @org.springframework.web.bind.annotation.RequestParam(value = "tenant", required = false) String requestedTenant,
+            Authentication authentication
+    ) {
+        String role = extractRole(authentication);
         String tenantId = extractTenant(authentication);
+        if ("SYSTEM_ADMIN".equals(role)) {
+            tenantId = (requestedTenant != null && !requestedTenant.isBlank() && !"ALL".equalsIgnoreCase(requestedTenant))
+                    ? requestedTenant : "ALL";
+        }
         return ResponseEntity.ok(governanceService.getPendingConflicts(tenantId));
     }
 

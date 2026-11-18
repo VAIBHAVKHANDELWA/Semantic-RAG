@@ -1,200 +1,208 @@
 import React, { useState } from 'react';
 import { 
-  Network, 
   Mail, 
   Lock, 
   ArrowRight, 
-  Key,
-  UserCheck,
-  Activity,
-  FileCheck
+  ShieldCheck, 
+  Eye, 
+  EyeOff, 
+  AlertCircle,
+  Database,
+  Cpu,
+  Server
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { AppLogo } from '../common/AppLogo';
 import { motion } from 'framer-motion';
 
 interface AuthPageProps {
   initialMode?: 'login' | 'signup';
 }
 
-export const AuthPage: React.FC<AuthPageProps> = ({ initialMode: _initialMode = 'login' }) => {
-  const { 
-    loginWithCredentials,
-    navigate 
-  } = useApp();
-  const [email, setEmail] = useState('hr_steward@enterprise.com');
-  const [password, setPassword] = useState('password123');
+export const AuthPage: React.FC<AuthPageProps> = () => {
+  const { loginWithCredentials } = useApp();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setErrorMessage(null);
-    try {
-      await loginWithCredentials(email, password);
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Login failed. Please check credentials.');
-    } finally {
-      setIsLoading(false);
+    if (!email.trim() || !password) {
+      setErrorMessage('Please enter both your work email (ID) and password.');
+      return;
     }
-  };
 
-  const handleQuickPersona = async (pEmail: string) => {
     setIsLoading(true);
     setErrorMessage(null);
-    setEmail(pEmail);
-    setPassword('password123');
     try {
-      await loginWithCredentials(pEmail, 'password123');
+      await loginWithCredentials(email.trim().toLowerCase(), password);
+      // Automatic role-directed dashboard routing is handled in loginWithCredentials
     } catch (err: any) {
-      setErrorMessage(err.message || 'Quick login failed.');
+      setErrorMessage(err.message || 'Invalid enterprise credentials. Please check your email and password.');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#090d16] text-slate-100 flex items-center justify-center p-6 relative overflow-hidden font-sans">
-      {/* Background Glow Orbs */}
-      <div className="absolute top-1/4 left-1/3 w-96 h-96 bg-cyan-500/15 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/3 w-96 h-96 bg-indigo-500/15 rounded-full blur-[140px] pointer-events-none" />
+    <div className="min-h-screen bg-[#070b13] text-slate-100 flex items-center justify-center p-6 relative overflow-hidden font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
+      {/* Dynamic Cyber Grid Background */}
+      <div 
+        className="absolute inset-0 opacity-[0.03] pointer-events-none"
+        style={{
+          backgroundImage: `radial-gradient(circle at 1px 1px, #22d3ee 1px, transparent 0)`,
+          backgroundSize: '36px 36px'
+        }}
+      />
 
+      {/* Dynamic Ambient Gradient Orbs */}
       <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.25 }}
-        className="w-full max-w-lg rounded-3xl bg-slate-900/90 border border-slate-800 p-8 shadow-2xl backdrop-blur-2xl relative z-10 space-y-6"
+        animate={{ 
+          scale: [1, 1.15, 1],
+          opacity: [0.12, 0.2, 0.12]
+        }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute top-1/4 -left-20 w-[600px] h-[600px] bg-gradient-to-tr from-cyan-500/25 via-blue-600/15 to-transparent rounded-full blur-[160px] pointer-events-none"
+      />
+      <motion.div 
+        animate={{ 
+          scale: [1.15, 1, 1.15],
+          opacity: [0.15, 0.22, 0.15]
+        }}
+        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute bottom-1/4 -right-20 w-[600px] h-[600px] bg-gradient-to-bl from-indigo-600/25 via-cyan-500/15 to-transparent rounded-full blur-[160px] pointer-events-none"
+      />
+
+      {/* Main Glassmorphic Login Card */}
+      <motion.div 
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+        className="w-full max-w-md rounded-3xl bg-slate-900/80 border border-slate-800/90 p-8 shadow-2xl shadow-cyan-500/5 backdrop-blur-2xl relative z-10 space-y-6"
       >
-        {/* Header Logo */}
-        <div className="text-center space-y-2">
-          <div 
-            onClick={() => navigate('/')}
-            className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-700 flex items-center justify-center mx-auto shadow-lg shadow-cyan-500/20 cursor-pointer"
-          >
-            <Network className="w-6 h-6 text-white" />
+        {/* Brand Header */}
+        <div className="flex flex-col items-center text-center space-y-3">
+          <AppLogo size="xl" showWordmark={true} subtitle="ENTERPRISE SEMANTIC SENTINEL" animated={true} />
+          
+          <div className="pt-2">
+            <h2 className="text-xl font-bold text-slate-100 tracking-tight">
+              Enterprise Access Portal
+            </h2>
+            <p className="text-xs text-slate-400 mt-1 max-w-xs">
+              Authenticate with your enterprise ID to access your role-governed workspace.
+            </p>
           </div>
-          <h2 className="text-2xl font-bold text-slate-100">
-            Enterprise JWT Authentication
-          </h2>
-          <p className="text-xs text-slate-400">
-            Zero-trust Role-Based Access Control (RBAC) & tenant isolation gateway.
-          </p>
         </div>
 
-        {errorMessage && (
-          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-mono">
-            {errorMessage}
+        {/* Live Infrastructure Trust Bar */}
+        <div className="grid grid-cols-3 gap-1.5 p-2 rounded-xl bg-slate-950/70 border border-slate-800/70 text-[10px] font-mono text-slate-400 text-center">
+          <div className="flex items-center justify-center gap-1">
+            <Database className="w-3 h-3 text-emerald-400" />
+            <span className="text-emerald-300 font-semibold">pgvector 16</span>
           </div>
+          <div className="flex items-center justify-center gap-1 border-x border-slate-800">
+            <Cpu className="w-3 h-3 text-cyan-400" />
+            <span className="text-cyan-300 font-semibold">MiniLM+DeBERTa</span>
+          </div>
+          <div className="flex items-center justify-center gap-1">
+            <Server className="w-3 h-3 text-purple-400" />
+            <span className="text-purple-300 font-semibold">Zero-Trust</span>
+          </div>
+        </div>
+
+        {/* Error Alert */}
+        {errorMessage && (
+          <motion.div 
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-mono flex items-center gap-2.5 shadow-sm"
+          >
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{errorMessage}</span>
+          </motion.div>
         )}
 
-        {/* 1-CLICK QUICK PERSONA LOGIN BUTTONS */}
-        <div className="space-y-2 p-4 rounded-2xl bg-slate-950/80 border border-cyan-500/30 glow-cyan">
-          <div className="text-[11px] font-mono text-cyan-300 font-bold uppercase tracking-wider text-center flex items-center justify-center gap-1.5">
-            <Key className="w-3.5 h-3.5 text-cyan-400" /> Instant Role Personas (Gateway API)
-          </div>
-
-          <div className="space-y-2 text-xs">
-            {/* Button 1: Data Steward (HR) */}
-            <button
-              type="button"
-              disabled={isLoading}
-              onClick={() => handleQuickPersona('hr_steward@enterprise.com')}
-              className="w-full p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-cyan-500/40 text-slate-200 text-left flex items-center justify-between transition-all group disabled:opacity-50"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-300">
-                  <UserCheck className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="font-bold text-cyan-300">Data Steward (HR Department)</div>
-                  <div className="text-[10px] text-slate-500 font-mono">hr_steward@enterprise.com</div>
-                </div>
-              </div>
-              <ArrowRight className="w-4 h-4 text-cyan-400 group-hover:translate-x-1 transition-transform" />
-            </button>
-
-            {/* Button 2: System Admin */}
-            <button
-              type="button"
-              disabled={isLoading}
-              onClick={() => handleQuickPersona('hr_admin@enterprise.com')}
-              className="w-full p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-slate-200 text-left flex items-center justify-between transition-all group disabled:opacity-50"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-300">
-                  <Activity className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="font-bold text-amber-300">System Admin (Full Privileges)</div>
-                  <div className="text-[10px] text-slate-500 font-mono">hr_admin@enterprise.com</div>
-                </div>
-              </div>
-              <ArrowRight className="w-4 h-4 text-amber-400 group-hover:translate-x-1 transition-transform" />
-            </button>
-
-            {/* Button 3: Compliance Auditor */}
-            <button
-              type="button"
-              disabled={isLoading}
-              onClick={() => handleQuickPersona('legal_auditor@enterprise.com')}
-              className="w-full p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-purple-500/40 text-slate-200 text-left flex items-center justify-between transition-all group disabled:opacity-50"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="p-1.5 rounded-lg bg-purple-500/20 text-purple-300">
-                  <FileCheck className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="font-bold text-purple-300">Compliance Auditor (Legal Scope)</div>
-                  <div className="text-[10px] text-slate-500 font-mono">legal_auditor@enterprise.com</div>
-                </div>
-              </div>
-              <ArrowRight className="w-4 h-4 text-purple-400 group-hover:translate-x-1 transition-transform" />
-            </button>
-          </div>
-        </div>
-
-        {/* Traditional Credentials Form */}
+        {/* Interactive Credentials Form */}
         <form onSubmit={handleFormSubmit} className="space-y-4">
-          <div className="space-y-1">
-            <label className="text-xs text-slate-400 font-mono flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5 text-cyan-400" /> Enterprise Work Email
+          {/* Work Email / User ID */}
+          <div className="space-y-1.5">
+            <label className="text-xs text-slate-300 font-semibold flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-cyan-400" /> Enterprise Work Email / ID
+              </span>
+              <span className="text-[10px] text-slate-500 font-mono">Mapped to 1 Role</span>
             </label>
-            <input 
-              type="email" 
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="user@enterprise.com"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-500 text-sm text-slate-200 focus:outline-none transition-colors"
-            />
+            <div className="relative group">
+              <input 
+                type="email" 
+                required
+                autoFocus
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="e.g. karan.singh@enterprise.com"
+                className="w-full px-4 py-3 rounded-xl bg-slate-950/90 border border-slate-800 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 transition-all font-mono"
+              />
+            </div>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs text-slate-400 font-mono flex items-center gap-1.5">
-              <Lock className="w-3.5 h-3.5 text-cyan-400" /> Password
+          {/* Password */}
+          <div className="space-y-1.5">
+            <label className="text-xs text-slate-300 font-semibold flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-cyan-400" /> Password
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="text-[11px] text-slate-500 hover:text-cyan-300 transition-colors flex items-center gap-1 font-mono"
+              >
+                {showPassword ? <EyeOff className="w-3 h-3 text-cyan-400" /> : <Eye className="w-3 h-3 text-slate-400" />}
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
             </label>
-            <input 
-              type="password" 
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••••••"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-500 text-sm text-slate-200 focus:outline-none transition-colors"
-            />
+            <div className="relative">
+              <input 
+                type={showPassword ? 'text' : 'password'} 
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••••••"
+                className="w-full px-4 py-3 rounded-xl bg-slate-950/90 border border-slate-800 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 transition-all font-mono"
+              />
+            </div>
           </div>
 
+          {/* Sign In Button with Sweep Glow Effect */}
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-sm shadow-lg shadow-cyan-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:via-blue-500 hover:to-indigo-500 text-slate-950 font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/25 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 cursor-pointer mt-2"
           >
-            {isLoading ? 'Authenticating with Backend...' : 'Authenticate via Java API Gateway'}
-            <ArrowRight className="w-4 h-4" />
+            {isLoading ? (
+              <span className="flex items-center gap-2">
+                <span className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                <span>Authenticating & Routing...</span>
+              </span>
+            ) : (
+              <>
+                <span>Sign In to Workspace</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
           </button>
         </form>
 
-        <div className="text-center text-xs text-slate-500">
-          Default seed password: <code className="text-cyan-400 font-mono">password123</code>
+        {/* Security & Enforcement Notice */}
+        <div className="pt-3 border-t border-slate-800/80 text-center space-y-1.5">
+          <div className="text-[11px] text-slate-400 font-mono flex items-center justify-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span>Automatic role routing & tenant isolation via signed JWT</span>
+          </div>
+          <div className="text-[10px] text-slate-500 font-mono">
+            Default test password: <span className="text-slate-300 font-bold">password123</span>
+          </div>
         </div>
       </motion.div>
     </div>

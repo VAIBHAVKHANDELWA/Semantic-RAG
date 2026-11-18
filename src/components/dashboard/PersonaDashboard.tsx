@@ -36,6 +36,7 @@ import { UserManagementView } from '../admin/UserManagementView';
 import { ComplianceAuditLogsView } from '../audit/ComplianceAuditLogsView';
 import { ArchivedChunksView } from '../audit/ArchivedChunksView';
 import { AiPipelineVisualizer } from '../pipeline/AiPipelineVisualizer';
+import { PolicyChatbot } from '../chat/PolicyChatbot';
 import { motion } from 'framer-motion';
 
 // Mock Performance Data for System Admin Charts
@@ -116,6 +117,14 @@ export const PersonaDashboard: React.FC = () => {
     return (
       <div className="p-6 max-w-7xl mx-auto space-y-6">
         <QuarantineCenter />
+      </div>
+    );
+  }
+
+  if (activeView === 'rag_chat') {
+    return (
+      <div className="p-6 max-w-7xl mx-auto space-y-6">
+        <PolicyChatbot />
       </div>
     );
   }

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { 
-  Brain, 
-  Database, 
-  Play, 
-  ShieldAlert, 
+import {
+  Brain,
+  Database,
+  Play,
+  ShieldAlert,
   RefreshCw,
   Eye
 } from 'lucide-react';
@@ -110,7 +110,7 @@ export const AiPipelineVisualizer: React.FC = () => {
   };
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
@@ -143,11 +143,10 @@ export const AiPipelineVisualizer: React.FC = () => {
           <button
             onClick={handleRunSimulation}
             disabled={isRunning}
-            className={`px-4 py-2.5 rounded-xl font-extrabold text-xs flex items-center gap-2 font-mono transition-all ${
-              isRunning 
-                ? 'bg-slate-800 text-slate-500 cursor-not-allowed' 
-                : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 text-slate-950 shadow-lg shadow-purple-500/20'
-            }`}
+            className={`px-4 py-2.5 rounded-xl font-extrabold text-xs flex items-center gap-2 font-mono transition-all ${isRunning
+              ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+              : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 text-slate-950 shadow-lg shadow-purple-500/20'
+              }`}
           >
             {isRunning ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
             <span>{isRunning ? 'Running Pipeline...' : 'Replay Last Adjudication Job'}</span>
@@ -160,18 +159,16 @@ export const AiPipelineVisualizer: React.FC = () => {
         {steps.map((st, idx) => {
           const isActive = activeStepIndex === idx;
           return (
-            <GlassCard 
+            <GlassCard
               key={st.stepIndex}
               glowColor={st.status === 'FLAGGED' ? 'amber' : isActive ? 'cyan' : 'emerald'}
-              className={`p-3.5 space-y-2 border transition-all ${
-                isActive ? 'ring-2 ring-cyan-400/50 bg-slate-900 scale-105' : 'opacity-90'
-              }`}
+              className={`p-3.5 space-y-2 border transition-all ${isActive ? 'ring-2 ring-cyan-400/50 bg-slate-900 scale-105' : 'opacity-90'
+                }`}
             >
               <div className="flex items-center justify-between text-[10px]">
                 <span className="text-slate-500">STAGE {st.stepIndex}</span>
-                <span className={`px-1.5 py-0.5 rounded font-bold ${
-                  st.status === 'FLAGGED' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-emerald-500/10 text-emerald-400'
-                }`}>
+                <span className={`px-1.5 py-0.5 rounded font-bold ${st.status === 'FLAGGED' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-emerald-500/10 text-emerald-400'
+                  }`}>
                   {st.status}
                 </span>
               </div>

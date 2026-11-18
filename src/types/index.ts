@@ -19,34 +19,41 @@ export interface User {
 
 export type UserProfile = User;
 
-export type AppRoute = 
-  | '/' 
-  | '/login' 
-  | '/onboarding' 
-  | '/dashboard' 
+export type AppRoute =
+  | '/'
+  | '/login'
+  | '/onboarding'
+  | '/dashboard'
   | '/admin/users'
-  | '/admin/billing' 
-  | '/admin/tenants' 
-  | '/admin/logs' 
+  | '/admin/billing'
+  | '/admin/tenants'
+  | '/admin/logs'
   | '/unauthorized';
 
-export type ActiveViewType = 
-  | 'quarantine' 
-  | 'ingestion' 
+export type ActiveViewType =
+  | 'quarantine'
+  | 'ingestion'
   | 'ai_pipeline'
-  | 'lineage' 
-  | 'analytics' 
-  | 'settings' 
-  | 'billing' 
-  | 'tenant_mgmt' 
-  | 'system_logs' 
+  | 'lineage'
+  | 'analytics'
+  | 'settings'
+  | 'billing'
+  | 'tenant_mgmt'
+  | 'system_logs'
   | 'audit_logs'
-  | 'user_mgmt';
+  | 'user_mgmt'
+  | 'rag_chat';
 
 export interface WorkspaceConfig {
   workspaceName: string;
   targetVectorDb: string;
   ingestionMode: string;
+  vectorDbEndpoint?: string;
+  vectorDbApiKey?: string;
+  vectorDbStatus?: string;
+  vectorDbLatencyMs?: number;
+  activeHnswIndex?: boolean;
+  dimension?: number;
 }
 
 export interface Tenant {
@@ -62,12 +69,12 @@ export interface Tenant {
 
 export type IngestionModality = 'NATIVE_TEXT' | 'OCR_TESSERACT';
 
-export type PipelineStage = 
-  | 'INGESTING' 
-  | 'CHUNK_ADAPTIVE' 
-  | 'EMBEDDING' 
-  | 'COLLISION_CHECK' 
-  | 'IN_VECTOR_DB' 
+export type PipelineStage =
+  | 'INGESTING'
+  | 'CHUNK_ADAPTIVE'
+  | 'EMBEDDING'
+  | 'COLLISION_CHECK'
+  | 'IN_VECTOR_DB'
   | 'QUARANTINED';
 
 export interface IngestionItem {
@@ -84,7 +91,7 @@ export interface IngestionItem {
   vectorDbStatus?: 'SYNCED' | 'PROCESSING' | 'FLAGGED';
 }
 
-export type LLMVerdictType = 
+export type LLMVerdictType =
   | 'CONTRADICTORY'
   | 'SUPERSIDING_POLICY'
   | 'PARTIAL_UPDATE'

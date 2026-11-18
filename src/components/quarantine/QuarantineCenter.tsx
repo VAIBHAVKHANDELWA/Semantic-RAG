@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { 
-  ShieldAlert, 
-  Filter, 
-  CheckCircle2, 
-  XCircle, 
-  Trash2, 
-  Edit3, 
-  Sparkles, 
+import {
+  ShieldAlert,
+  Filter,
+  CheckCircle2,
+  XCircle,
+  Trash2,
+  Edit3,
+  Sparkles,
   CheckCheck,
   Search,
   Lock
@@ -15,16 +15,15 @@ import { useApp } from '../../context/AppContext';
 import { LLMVerdictBar } from './LLMVerdictBar';
 import { ConflictViewer } from './ConflictViewer';
 import { ManualMergeModal } from './ManualMergeModal';
-import { GlassCard } from '../common/GlassCard';
 import { StatusBadge } from '../common/StatusBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const QuarantineCenter: React.FC = () => {
-  const { 
-    conflicts, 
-    selectedConflictId, 
-    setSelectedConflictId, 
-    resolveConflict, 
+  const {
+    conflicts,
+    selectedConflictId,
+    setSelectedConflictId,
+    resolveConflict,
     selectedTenant,
     setLineageModalConflictId,
     user
@@ -39,7 +38,7 @@ export const QuarantineCenter: React.FC = () => {
   const filteredConflicts = conflicts.filter(c => {
     const dept = c.department || c.tenantId;
     if (selectedTenant !== 'ALL' && dept !== selectedTenant) return false;
-    if (c.similarityScore < minSimilarity) return false;
+    if (c.similarityScore > 0 && c.similarityScore < minSimilarity) return false;
     if (statusFilter === 'PENDING' && c.status !== 'PENDING') return false;
     if (statusFilter === 'RESOLVED' && c.status === 'PENDING') return false;
     if (searchQuery) {
@@ -52,7 +51,7 @@ export const QuarantineCenter: React.FC = () => {
     return true;
   });
 
-  const activeConflict = conflicts.find(c => c.id === selectedConflictId) || filteredConflicts[0];
+  const activeConflict = filteredConflicts.find(c => c.id === selectedConflictId) || filteredConflicts[0];
 
   const handleAction = (action: 'ACCEPTED_INCOMING' | 'PROMOTED_INCOMING_ARCHIVED_OLD' | 'KEPT_EXISTING' | 'DISCARDED_BOTH') => {
     if (activeConflict) {
@@ -91,7 +90,7 @@ export const QuarantineCenter: React.FC = () => {
           {/* Search Input */}
           <div className="relative">
             <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2" />
-            <input 
+            <input
               type="text"
               placeholder="Search document or terms..."
               value={searchQuery}
@@ -103,7 +102,7 @@ export const QuarantineCenter: React.FC = () => {
           {/* Similarity Slider */}
           <div className="flex items-center gap-2 px-2">
             <span className="text-slate-400 font-mono text-[11px]">Similarity: &ge;{(minSimilarity * 100).toFixed(0)}%</span>
-            <input 
+            <input
               type="range"
               min="0.85"
               max="0.99"
@@ -120,11 +119,10 @@ export const QuarantineCenter: React.FC = () => {
               <button
                 key={st}
                 onClick={() => setStatusFilter(st)}
-                className={`px-2.5 py-1 rounded-md text-[11px] transition-colors ${
-                  statusFilter === st 
-                    ? 'bg-cyan-500/20 text-cyan-300 font-bold' 
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
+                className={`px-2.5 py-1 rounded-md text-[11px] transition-colors ${statusFilter === st
+                  ? 'bg-cyan-500/20 text-cyan-300 font-bold'
+                  : 'text-slate-400 hover:text-slate-200'
+                  }`}
               >
                 {st}
               </button>
@@ -155,32 +153,38 @@ export const QuarantineCenter: React.FC = () => {
                 <div
                   key={c.id}
                   onClick={() => setSelectedConflictId(c.id)}
-                  className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                    isSelected 
-                      ? 'bg-slate-900 border-cyan-500/50 glow-cyan' 
-                      : 'bg-slate-900/50 border-slate-800/80 hover:border-slate-700'
+                  className={`p-4 rounded-2xl border cursor-pointer transition-all relative overflow-hidden group ${
+                    isSelected
+                      ? 'bg-gradient-to-r from-cyan-950/40 via-slate-900 to-slate-900 border-cyan-500/60 shadow-lg shadow-cyan-500/10 ring-1 ring-cyan-500/30'
+                      : 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/90'
                   }`}
                 >
+                  {/* Selected Indicator Left Glow */}
+                  {isSelected && (
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-cyan-400 to-blue-500" />
+                  )}
+
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] font-mono font-bold">
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                       {(c.similarityScore * 100).toFixed(1)}% Collision
                     </span>
 
-                    <StatusBadge 
-                      status={isPending ? 'pending' : 'clean'} 
+                    <StatusBadge
+                      status={isPending ? 'pending' : 'clean'}
                       label={isPending ? 'PENDING' : c.status.replace('_', ' ')}
                     />
                   </div>
 
-                  <div className="text-xs font-semibold text-slate-200 truncate">
+                  <div className="text-xs font-bold text-slate-100 group-hover:text-cyan-300 transition-colors truncate">
                     {c.incomingChunk.docName}
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5 truncate">
+                  <div className="text-[11px] text-slate-400 mt-1 truncate">
                     vs {c.existingChunk.docName}
                   </div>
 
-                  <div className="mt-3 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] text-slate-500 font-mono">
-                    <span>{c.department}</span>
+                  <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-500 font-mono">
+                    <span className="px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800/80 text-cyan-400 font-semibold">{c.department}</span>
                     <span>{c.createdAt.slice(11, 16)}</span>
                   </div>
                 </div>
@@ -202,14 +206,14 @@ export const QuarantineCenter: React.FC = () => {
                 className="space-y-6"
               >
                 {/* 1. Conflict Analysis & LLM Verdict Bar */}
-                <LLMVerdictBar 
-                  conflict={activeConflict} 
+                <LLMVerdictBar
+                  conflict={activeConflict}
                   onOpenLineageModal={(id) => setLineageModalConflictId(id)}
                 />
 
                 {/* 2. Pluggable Department Conflict Viewer */}
-                <ConflictViewer 
-                  existingChunk={activeConflict.existingChunk} 
+                <ConflictViewer
+                  existingChunk={activeConflict.existingChunk}
                   incomingChunk={activeConflict.incomingChunk}
                   tenant={activeConflict.department}
                 />
@@ -224,14 +228,15 @@ export const QuarantineCenter: React.FC = () => {
                 )}
 
                 {/* 3. Action Bar with 4 Resolution Buttons or Read-Only Banner */}
-                <GlassCard className="p-4 bg-slate-900/90 border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3">
                   <div className="text-xs text-slate-400 font-medium">
                     {activeConflict.status === 'PENDING' ? (
-                      <span className="flex items-center gap-1.5 text-amber-400 font-mono">
+                      <span className="flex items-center gap-2 text-amber-400 font-mono font-semibold">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
                         <Sparkles className="w-4 h-4" /> Human Compliance Review Required
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1.5 text-emerald-400 font-mono">
+                      <span className="flex items-center gap-2 text-emerald-400 font-mono font-semibold">
                         <CheckCircle2 className="w-4 h-4" /> Resolved: {activeConflict.status}
                       </span>
                     )}
@@ -247,7 +252,7 @@ export const QuarantineCenter: React.FC = () => {
                       {/* Button 1: Promote Incoming (Archive Old) */}
                       <button
                         onClick={() => handleAction('PROMOTED_INCOMING_ARCHIVED_OLD')}
-                        className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-emerald-500/10"
+                        className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-emerald-300 border border-emerald-500/50 text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-500/10 hover:scale-[1.02] cursor-pointer"
                         title="Promote Chunk B to Active and safely soft-archive Chunk A for audit compliance"
                       >
                         <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -257,7 +262,7 @@ export const QuarantineCenter: React.FC = () => {
                       {/* Button 2: Keep Existing (Discard Incoming) */}
                       <button
                         onClick={() => handleAction('KEPT_EXISTING')}
-                        className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-amber-500/10"
+                        className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 border border-amber-500/50 text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-md shadow-amber-500/10 hover:scale-[1.02] cursor-pointer"
                         title="Discard Chunk B and retain existing Chunk A"
                       >
                         <XCircle className="w-4 h-4 text-amber-400" />
@@ -267,7 +272,7 @@ export const QuarantineCenter: React.FC = () => {
                       {/* Button 3: Discard Both */}
                       <button
                         onClick={() => handleAction('DISCARDED_BOTH')}
-                        className="px-3.5 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-rose-500/10"
+                        className="px-3.5 py-2.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/40 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm hover:scale-[1.02] cursor-pointer"
                         title="Purge both chunks from pipeline"
                       >
                         <Trash2 className="w-4 h-4 text-rose-400" />
@@ -277,7 +282,7 @@ export const QuarantineCenter: React.FC = () => {
                       {/* Button 4: Edit & Merge Manually */}
                       <button
                         onClick={() => setMergeModalOpen(true)}
-                        className="px-3.5 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-cyan-500/10"
+                        className="px-3.5 py-2.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm hover:scale-[1.02] cursor-pointer"
                         title="Edit reconciled text manually"
                       >
                         <Edit3 className="w-4 h-4 text-cyan-400" />
@@ -285,7 +290,7 @@ export const QuarantineCenter: React.FC = () => {
                       </button>
                     </div>
                   )}
-                </GlassCard>
+                </div>
               </motion.div>
             </AnimatePresence>
           ) : (

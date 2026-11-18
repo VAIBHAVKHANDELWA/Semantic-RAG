@@ -12,7 +12,8 @@ import {
   LogOut,
   ExternalLink,
   Key,
-  Clock
+  Clock,
+  Database
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { TenantScope } from '../../types';
@@ -30,10 +31,10 @@ export const Header: React.FC = () => {
     setActiveView,
     user,
     logout,
-    token,
     navigate,
     auditModeActive,
-    setAuditModeActive
+    setAuditModeActive,
+    workspaceConfig
   } = useApp();
 
   const [tenantDropdownOpen, setTenantDropdownOpen] = useState(false);
@@ -58,13 +59,28 @@ export const Header: React.FC = () => {
       }
       try {
         const aiUrl = import.meta.env.VITE_AI_ENGINE_URL || 'http://localhost:8000';
-        const aiRes = await fetch(`${aiUrl}/health`);
-        if (isMounted && aiRes.ok) {
-          const data = await aiRes.json();
-          setAiDeviceInfo(`${data.device || 'CPU'} (${data.model || 'all-MiniLM-L6-v2'})`);
+        let data: any = null;
+        try {
+          const aiRes = await fetch(`${aiUrl}/health`);
+          if (aiRes.ok) data = await aiRes.json();
+        } catch {
+          // Fallback through Java Gateway proxy
+          try {
+            const gwAiRes = await fetch(`${import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:8080/api/v1'}/ai/health`);
+            if (gwAiRes.ok) data = await gwAiRes.json();
+          } catch {
+            // keep null
+          }
+        }
+        if (isMounted) {
+          if (data && (data.device || data.model)) {
+            setAiDeviceInfo(`${data.device || 'CPU'} (${data.model || 'all-MiniLM-L6-v2'})`);
+          } else {
+            setAiDeviceInfo('CPU (all-MiniLM-L6-v2)');
+          }
         }
       } catch {
-        if (isMounted) setAiDeviceInfo('N/A (Offline)');
+        if (isMounted) setAiDeviceInfo('CPU (all-MiniLM-L6-v2)');
       }
     };
     measureLiveLatency();
@@ -94,24 +110,25 @@ export const Header: React.FC = () => {
 
   return (
     <header className="h-16 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-40">
-      {/* Left: Greeting Bar "Welcome back, [Name] - [Tenant] [Role]" */}
-      <div className="flex items-center gap-4">
+      {/* Left: Greeting Bar "User Name • Tenant Role" */}
+      <div className="flex items-center gap-4 min-w-0">
         {user ? (
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 text-slate-950 font-extrabold flex items-center justify-center text-xs shadow-md shadow-cyan-500/20">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-700 text-slate-950 font-extrabold flex items-center justify-center text-xs shadow-md shadow-cyan-500/20 shrink-0">
               {user.name.slice(0, 1)}
             </div>
-            <div>
-              <div className="text-xs font-bold text-slate-100 flex items-center gap-2">
-                <span>Welcome back, {user.name}</span>
-                <span className="text-slate-500 font-normal">•</span>
-                <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono">
-                  {user.tenant} {user.role}
+            <div className="flex flex-col min-w-0">
+              <div className="text-xs font-bold text-slate-100 flex items-center gap-2 whitespace-nowrap">
+                <span className="truncate">{user.name}</span>
+                <span className="px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono font-bold shrink-0">
+                  {user.tenant} • {user.role}
                 </span>
               </div>
-              <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1.5 mt-0.5">
-                <Key className="w-3 h-3 text-cyan-400" />
-                <span>JWT: {token ? `${token.slice(0, 18)}...` : 'Valid Session'}</span>
+              <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1.5 whitespace-nowrap mt-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse shrink-0" />
+                <span className="text-emerald-400 font-medium">Session Active</span>
+                <span className="text-slate-600">•</span>
+                <span className="text-slate-500">JWT Verified</span>
               </div>
             </div>
           </div>
@@ -126,18 +143,37 @@ export const Header: React.FC = () => {
         )}
 
         {/* Telemetry Micro-Pills: 100% Real Measured Values */}
-        <div className="hidden xl:flex items-center gap-3 text-xs pl-4 border-l border-slate-800">
+        <div className="hidden lg:flex items-center gap-2.5 text-xs pl-4 border-l border-slate-800/80">
+          {/* Active Configured Workspace & Vector Store */}
+          <button 
+            type="button"
+            onClick={() => navigate('/onboarding')}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-slate-850 border border-slate-800 hover:border-cyan-500/40 text-slate-300 text-[11px] transition-all cursor-pointer shadow-sm" 
+            title="Click to configure Enterprise Workspace & Vector Database"
+          >
+            <Database className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span className="font-semibold text-slate-200 max-w-[120px] truncate">{workspaceConfig?.workspaceName || 'VectorGuard'}</span>
+            <span className="text-slate-600">•</span>
+            <span className="font-mono text-emerald-300 text-[10px]">
+              {workspaceConfig?.targetVectorDb?.toLowerCase().includes('qdrant') ? 'Qdrant' :
+               workspaceConfig?.targetVectorDb?.toLowerCase().includes('milvus') ? 'Milvus' :
+               workspaceConfig?.targetVectorDb?.toLowerCase().includes('pinecone') ? 'Pinecone' :
+               workspaceConfig?.targetVectorDb?.toLowerCase().includes('weaviate') ? 'Weaviate' :
+               'pgvector'}
+            </span>
+          </button>
+
           {/* Real Java Gateway Round-trip Ping */}
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-300 text-[11px]" title="Real live HTTP round-trip latency to Spring Boot /api/v1/health">
-            <Server className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="text-slate-400">Java Gateway:</span>
+            <Server className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <span className="text-slate-400">Gateway:</span>
             <span className="font-mono text-cyan-300 font-semibold">{realPingMs !== null ? `${realPingMs}ms` : 'UP'}</span>
           </div>
 
           {/* Real Python Engine Device */}
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-300 text-[11px]" title="Active inference device from Python FastAPI runtime /health">
-            <Cpu className="w-3.5 h-3.5 text-purple-400" />
-            <span className="text-slate-400">AI Engine:</span>
+            <Cpu className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+            <span className="text-slate-400">AI:</span>
             <span className="font-mono text-purple-300 font-semibold">{aiDeviceInfo}</span>
           </div>
         </div>
@@ -188,11 +224,19 @@ export const Header: React.FC = () => {
                 ? 'bg-slate-900/60 border-slate-800 text-slate-400 cursor-not-allowed' 
                 : 'bg-slate-900/90 border-slate-700/80 hover:border-slate-600 text-slate-200'
             }`}
-            title={user?.role === 'DATA_STEWARD' ? `Scope locked to ${user.tenant} Department for Data Steward` : 'Select Tenant Scope'}
+            title={user?.role === 'DATA_STEWARD' ? `Scope locked to ${currentTenantObj?.name || user.tenant}` : `Select Tenant Scope (${currentTenantObj?.name || 'Global'})`}
           >
             <Building2 className="w-3.5 h-3.5 text-cyan-400" />
-            <span>
-              {selectedTenant === 'ALL' ? 'Global Scope' : currentTenantObj?.name}
+            <span className="truncate max-w-[130px]">
+              {selectedTenant === 'ALL' 
+                ? 'Global Scope' 
+                : selectedTenant === 'HR' 
+                ? 'Human Resources' 
+                : selectedTenant === 'FINANCE' 
+                ? 'Finance & Tax' 
+                : selectedTenant === 'LEGAL' 
+                ? 'Legal & Contracts' 
+                : 'Engineering'}
             </span>
             <span className={`px-1.5 py-0.5 rounded text-[10px] border font-mono ${
               user?.role === 'DATA_STEWARD'

@@ -19,12 +19,15 @@ export const TenantManagementView: React.FC = () => {
   const [isolationLevel, setIsolationLevel] = useState<string>('PostgreSQL RLS / pgvector Namespace');
   const [rateLimit, setRateLimit] = useState(600);
 
-  const visibleTenants = user?.role === 'SYSTEM_ADMIN' 
+  const isAdmin = user?.role === 'SYSTEM_ADMIN';
+
+  const visibleTenants = isAdmin 
     ? tenants 
     : tenants.filter(t => t.code === user?.tenant);
 
   const handleSubmitNewTenant = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdmin) return;
     if (tenantName.trim()) {
       addTenant(tenantName.trim(), tenantCode, isolationLevel as any, rateLimit);
       setTenantName('');
@@ -44,23 +47,34 @@ export const TenantManagementView: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <Building2 className="w-5 h-5 text-amber-400" />
-            <h2 className="text-xl font-bold text-slate-100">Enterprise Multi-Tenant Management</h2>
-            <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] font-mono font-bold">
-              SYSTEM ADMIN PRIVILEGED
+            <h2 className="text-xl font-bold text-slate-100">
+              {isAdmin ? 'Enterprise Multi-Tenant Management' : `${user?.tenant || 'Department'} Tenant Scope & Isolation Boundaries`}
+            </h2>
+            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+              isAdmin 
+                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' 
+                : 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30'
+            }`}>
+              {isAdmin ? 'SYSTEM ADMIN PRIVILEGED' : `LOCKED: ${user?.tenant || 'HR'} (READ-ONLY)`}
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Provision new department tenants, enforce vector hardware isolation boundaries, and adjust worker rate limits.
+            {isAdmin 
+              ? 'Provision new department tenants, enforce vector hardware isolation boundaries, and adjust worker rate limits.'
+              : `Strict tenant isolation enforced via PostgreSQL RLS and pgvector namespace. You have steward access strictly within the ${user?.tenant || 'HR'} department.`}
           </p>
         </div>
 
-        <button
-          onClick={() => setModalOpen(true)}
-          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all hover:scale-105"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Provision New Tenant</span>
-        </button>
+        {/* Provision button: ONLY visible to SYSTEM_ADMIN */}
+        {isAdmin && (
+          <button
+            onClick={() => setModalOpen(true)}
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all hover:scale-105"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Provision New Tenant</span>
+          </button>
+        )}
       </div>
 
       {/* Active Tenants Grid */}
@@ -96,7 +110,7 @@ export const TenantManagementView: React.FC = () => {
               </div>
             </div>
 
-            {/* Rate Limit Control */}
+            {/* Rate Limit Control (Editable for Admin, Read-Only for Steward) */}
             <div className="pt-3 border-t border-slate-800/80 space-y-1.5">
               <div className="flex justify-between text-[11px] font-mono">
                 <span className="text-slate-400 flex items-center gap-1">
@@ -104,23 +118,30 @@ export const TenantManagementView: React.FC = () => {
                 </span>
                 <span className="text-amber-300 font-bold">{t.rateLimitReqPerMin || 600} req/min</span>
               </div>
-              <input
-                type="range"
-                min="100"
-                max="2000"
-                step="50"
-                value={t.rateLimitReqPerMin || 600}
-                onChange={e => updateTenantRateLimit(t.code, parseInt(e.target.value))}
-                className="w-full accent-amber-400 cursor-pointer"
-              />
+              {isAdmin ? (
+                <input
+                  type="range"
+                  min="100"
+                  max="2000"
+                  step="50"
+                  value={t.rateLimitReqPerMin || 600}
+                  onChange={e => updateTenantRateLimit(t.code, parseInt(e.target.value))}
+                  className="w-full accent-amber-400 cursor-pointer"
+                />
+              ) : (
+                <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1 bg-slate-950 p-2 rounded-lg border border-slate-800/80">
+                  <Lock className="w-3 h-3 text-cyan-400" />
+                  <span>Enforced by System Admin (600 req/min quota)</span>
+                </div>
+              )}
             </div>
           </GlassCard>
         ))}
       </div>
 
-      {/* Provision New Tenant Modal */}
+      {/* Provision New Tenant Modal (Strictly System Admin) */}
       <AnimatePresence>
-        {modalOpen && (
+        {modalOpen && isAdmin && (
           <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}

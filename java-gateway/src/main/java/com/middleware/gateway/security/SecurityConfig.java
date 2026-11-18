@@ -52,7 +52,7 @@ public class SecurityConfig {
                 })
             )
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/health", "/api/v1/auth/**").permitAll()
+                .requestMatchers("/api/v1/health", "/api/v1/ai/health", "/api/v1/auth/**").permitAll()
                 .requestMatchers("/api/v1/**").authenticated()
                 .anyRequest().permitAll()
             )

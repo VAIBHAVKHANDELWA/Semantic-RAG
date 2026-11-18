@@ -1,18 +1,18 @@
 import React from 'react';
-import { 
-  Network, 
-  ArrowRight, 
-  ShieldCheck, 
-  Zap, 
-  Database, 
-  Cpu, 
-  FileText, 
-  Sparkles, 
-  AlertTriangle, 
-  Lock, 
+import {
+  ArrowRight,
+  ShieldCheck,
+  Zap,
+  Database,
+  Cpu,
+  FileText,
+  Sparkles,
+  AlertTriangle,
+  Lock,
   Activity
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { AppLogo } from '../common/AppLogo';
 import { motion } from 'framer-motion';
 
 export const LandingPage: React.FC = () => {
@@ -23,13 +23,7 @@ export const LandingPage: React.FC = () => {
       {/* Top Glassmorphic Navigation Bar */}
       <nav className="h-20 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl sticky top-0 z-50 px-6 lg:px-12 flex items-center justify-between">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-700 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-            <Network className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-base font-extrabold tracking-wider text-slate-100 uppercase">Semantic RAG</h1>
-            <p className="text-[10px] text-cyan-400 font-mono tracking-tight">CONFLICT-AWARE PRUNING ENGINE</p>
-          </div>
+          <AppLogo size="md" showWordmark={true} subtitle="ENTERPRISE SEMANTIC SENTINEL" />
         </div>
 
         {/* Center Nav Items */}
@@ -64,7 +58,7 @@ export const LandingPage: React.FC = () => {
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-gradient-to-r from-cyan-500/20 via-blue-600/20 to-purple-600/20 blur-[120px] rounded-full pointer-events-none" />
 
         {/* Badge */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/90 border border-cyan-500/30 text-cyan-300 text-xs font-mono shadow-md shadow-cyan-500/10"
@@ -74,7 +68,7 @@ export const LandingPage: React.FC = () => {
         </motion.div>
 
         {/* Main Headline */}
-        <motion.h1 
+        <motion.h1
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
@@ -87,7 +81,7 @@ export const LandingPage: React.FC = () => {
         </motion.h1>
 
         {/* Subtitle */}
-        <motion.p 
+        <motion.p
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
@@ -97,7 +91,7 @@ export const LandingPage: React.FC = () => {
         </motion.p>
 
         {/* CTAs */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
@@ -128,7 +122,7 @@ export const LandingPage: React.FC = () => {
         </div>
 
         {/* Interactive Hero Preview Card */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
